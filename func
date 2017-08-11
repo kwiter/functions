@@ -1,0 +1,2517 @@
+
+#' STP FUNCTIONS: A package of internal STP functions
+#'
+#' the STP package ....
+#' 
+#' @section Plot Functions
+#' The Plot Functions...
+#' 
+#' @section I/O Functions
+#' The I/O Functions...
+#' 
+#'
+#' @docType package
+#' @name stp
+#' 
+#' 
+###
+#
+#STP FUNCTIONS Start:1/1/17
+#MKwit@sierratradingpost.com
+#
+###
+
+#' Install and load packages
+#' 
+#' @param packages String vector of package names
+#' @return None
+#' @examples
+#' loadPack(c("doParallel","foreach"))
+loadPack = function(packages){
+  # Author: MCKwit
+  
+  new.packages <- packages[!(packages %in% installed.packages()[,"Package"])] 
+  if(length(new.packages)) install.packages(new.packages, repos = "http://cran.stat.ucla.edu/") 
+  tmp = sapply(packages,require, character.only = T)
+}
+
+#' Sets a standard STP colors for Plots
+#' 
+#' @param None
+#' @return Sets a standard colors for Plots
+#' @examples
+#' stpColors()
+stpColors <- function(){
+  # Author: MCKwit
+  
+  assign('stpBlk',"#212429",envir=.GlobalEnv)
+  assign('stpOrg',"#f98900",envir=.GlobalEnv)
+  assign('stpGry',"#3F3F47",envir=.GlobalEnv)
+  assign('stpLGy',"#535459",envir=.GlobalEnv)
+  assign('stpGrn','#27562C',envir=.GlobalEnv)
+  assign('stpBlu','#084C61',envir=.GlobalEnv)
+  assign('stpVio','#0E1428',envir=.GlobalEnv)
+  assign('stpBro','#512C17',envir=.GlobalEnv)
+  
+  #darken orange #ef6f00 
+  #goldish #f0aa00
+  #red #db3d40
+  #gray #979da0
+  #g-lighten-5 #fafafa
+  #g-lighten-4 #f5f5f5
+  #g-lighten-3 #ededed
+  #g-lighten-2 #dbdbdb
+  #g-lighten-1 #bac0c2
+  #g-darken-1 #fafafa
+  #g-darken-2 #fafafa
+  #g-darken-3 #fafafa
+  #g-darken-4 #fafafa
+  #g-darken-5 #fafafa
+  
+  #allCols = c(stpBlk,stpOrg,stpGry,stpLGy,stpGrn,stpBlu,stpVio,stpBro)
+  
+  par(fg = stpBlk)
+  cos =  c(stpGry,stpOrg,stpGrn,stpBlu,stpVio,stpBro)
+  
+  palette(cos)
+  
+}
+
+
+#' Formats numbers percents and dollars all formats shared based on biggest number
+#' 
+#' @param num Vector of numbers to be formated
+#' @param digits Number of decimel places
+#' @param type c("#","%","$")
+#' @return Formated number
+#' @examples
+#' 
+#' num = c(20020000002020.6666,20,10000,5.5555)
+#' formatNum(num)
+#' formatNum(num,digits = 0)
+#' formatNum(num,type="%")
+#' formatNum(num,type="$")
+#' num = 55.66
+#' formatNum(num)
+formatNum <- function(num,type="#",digits = NULL){ #type= c("#","%","$","any unit agged to the end")
+  # Author: MCKwit
+  
+  num = as.numeric(num)
+  whr = which(!is.na(num))
+  hold = num
+  num = num[whr]
+  if(is.null(digits)){
+  if(max(abs(num)) >= 1000){ digits = 0}else{digits = 2}
+  }
+  mark1 = mark2 = ""
+  if(type == "$") mark1 = type
+  if(!(type %in% c("#","$"))) mark2 = type
+  
+  hold[whr] = paste0(mark1,formatC(num,digits=digits,big.mark = ",",small.mark = ".",format= "f"),mark2)
+  hold
+}
+
+
+#' Add Transparency to colors
+#' 
+#' @param Colors vector of colors to add transparency (HEx)
+#' @param alpha vector or single tansparency value [0:1]
+#' @return Vector of HEX
+#' @examples
+#' tranCol(colors = palette(),alpha=1)
+tranCol = function(colors = palette(),alpha=1){
+  # Author: MCKwit
+
+  rgb(t(col2rgb(colors))/255,alpha=alpha)
+
+}
+
+
+#' Shaded Line Graph
+#' 
+#' @param x,y Numeric vectors
+#' @param xlims
+#' @param ylims
+#' @param zeroLine Line where shading changes length(y)
+#' @param horLine Add hor line at value of horLine
+#' @param lineType 
+#' @param grid Add a grid
+#' @param tit Title 
+#' @param xLab X label 
+#' @param yLab Y label
+#' @return Plot of y~x shaded
+#' @examples 
+#' x = seq(1,100,by=5)
+#' y = cos(x/10)
+#' z = cos(x/10)/5
+#' shadeLine(x,y,tit='go',zeroLine = 0)
+#' shadeLine(x,y,zeroLine = z,plotly=T, tit='go', xLab = 'Xlabel', yLab='Ylabel')
+shadeLine <- function(x, y, zeroLine = 0, plotly = F,
+                      xlims = c(min(x),max(x)), ylims = c(min(y),max(y)) , 
+                      horLine = NULL, lineType = 1, grid=T,
+                      tit = '', xLab = '', yLab=''){
+  # Author: MCKwit
+   
+  
+    
+    if(length(zeroLine) == 1){zeroLine = rep(zeroLine,length(y))}
+  
+    #Force the shading to match the lines
+    whr = which(sign(y[-length(y)] - zeroLine[-length(y)]) != sign(y[-1] - zeroLine[-1]))
+    if(length(whr)>0){
+    for(i in 1:length(whr)){
+      xs = weighted.mean(x[whr[i]:(whr[i]+1)],
+                         rev(abs(y[whr[i]:(whr[i]+1)] - zeroLine[whr[i]:(whr[i]+1)]))) 
+      ys = weighted.mean(zeroLine[whr[i]:(whr[i]+1)],
+                         rev(abs(y[whr[i]:(whr[i]+1)] - zeroLine[whr[i]:(whr[i]+1)]))) 
+      x = c(x,xs); y = c(y,ys); zeroLine = c(zeroLine,ys)
+    }
+    whr = order(x); x = x[whr]; y = y[whr]; zeroLine = zeroLine[whr];
+    }
+    #Above
+    tmp = y; tmp[which(y <= zeroLine)] = zeroLine[which(y <= zeroLine)]
+    #Below
+    tmp2 = y; tmp2[which(y > zeroLine)] = zeroLine[which(y > zeroLine)]
+  
+  if(!plotly){
+    
+    plot(x,y,xlim = xlims, ylim = ylims,type='n', bty='n',xaxt='n',yaxt='n',xlab='',ylab='')
+    
+    lines(x,y,lty=lineType)
+   
+    
+    polygon(c(x,rev(x)), c(zeroLine,rev(tmp)), col =rgb(.4,.4,.8,.7),border=NA)
+    
+    polygon(c(x,rev(x)), c(zeroLine,rev(tmp2)), col =rgb(.8,.4,.4,.7),border=NA)
+    
+    if(!is.null(horLine)){
+      abline(h = horLine)
+    }
+    if(grid) {
+      grid()  
+    }
+    
+    
+    axis(1,tick=F)
+    axis(2,tick=F)
+    title(main = tit, xlab = xLab, ylab= yLab)
+  }
+    
+    if(plotly){
+      if(!require(plotly)){
+        install.packages("plotly")
+        library(plotly)
+      }
+     
+      plot_ly() %>%
+        add_lines(x = x, y = y,
+                  color = I("black"), name = "Observed") %>%
+        add_lines(x = x, y = zeroLine,
+                line = list(color = 'grey',dash='dashed'), name = "Zero")  %>%
+        add_polygons(x = c(x,rev(x)), y = c(zeroLine,rev(tmp2)),
+                   line = list(color = 'rgba(7, 164, 181, 0.05)'),
+                   fillcolor = 'rgba(.8,.4,.4,.7)', name = "Negative") %>%
+        add_polygons(x = c(x,rev(x)), y = c(zeroLine,rev(tmp)),
+                   line = list(color = 'rgba(7, 164, 181, 0.05)'),
+                   fillcolor = 'rgba(.4,.4,.8,.7)', name = "Positive") %>%
+        layout(title = tit,
+              xaxis = list(title = xLab),
+              yaxis = list(title = yLab))
+    }
+}  
+
+
+#' Multiple Lines Graph
+#' 
+#' @param X Vector or matrix of x's
+#' @param y Vector or matrix of y's
+#' @param EMP Which column should be emphasized
+#' @param fits Add c('linear','quad','loess') fits to figure
+#' @param empFit Fit the emphasis line T or F
+#' @param xlims
+#' @param ylims
+#' @param horLine Add hor line at value of horLine
+#' @param lineType 
+#' @param grid Add a grid T or F
+#' @param tit title 
+#' @param xLab x label 
+#' @param yLab y label
+#' @return Multiple Lines on single graphe with empahasis of selected line
+#' @examples 
+#' X = 1:100
+#' n = 10
+#' Y = matrix(1,100,n)
+#' for(j in 1:n){
+#' for(i in 1:99){
+#'   Y[i+1,j] = Y[i,j] + rnorm(1,0,1) 
+#' }
+#' }
+#' linesPlot(X,Y,fits = c('linear','loess'),empFit = T )
+#' linesPlot(X,Y,fits = c('loess'),empFit = F )
+
+linesPlot <- function(X,Y,EMP = 1,fits = c('loess','linear','quad'),empFit = F,
+                        xlims = c(min(X),max(X)), ylims = c(min(Y),max(Y)) , 
+                        horLine = NULL, lineType = 1, grid=T,
+                        tit = '', xLab = '', yLab='') {
+  # Author: MCKwit
+  
+    X = as.matrix(X); Y = as.matrix(Y)
+    plot(X[,1],Y[,1],xlim = xlims, ylim = ylims,type='n', bty='n',xaxt='n',yaxt='n',xlab='',ylab='')
+    
+    if(ncol(X) == 1){
+      X = matrix(X[,1],nrow(X),ncol(Y),byrow=F)
+    }
+    
+    for(i in 1:ncol(Y)){
+      lines(X[,i],Y[,i],lty=lineType,col=tranCol(palette()[1],max(1,ncol(Y)/2)/ncol(Y)))
+    }
+    lines(X[,EMP],Y[,EMP], col = 2, lwd=3)
+    
+    fits = match(fits,c('loess','linear','quad'))
+    if(!is.na(fits) & length(fits)>0){
+    x = y = NULL
+    for(i in 1:ncol(Y)){
+      x = c(x,X[,i])
+      y = c(y,Y[,i])
+    }
+    dat = data.frame(x=x,y=y,x2=x*x)
+    
+    for(i in fits){
+      fit = eval(parse(text = c('loess(y~x,data=dat)','lm(y~x,data=dat)','lm(y~x+x2,data=dat)')[i]))
+      fit = predict( fit, newdata = data.frame(x = min(xlims):max(xlims),x2 = (min(xlims):max(xlims))^2 ), se = T )
+      polygon( c(min(xlims):max(xlims), max(xlims):min(xlims)),  
+               c(fit$fit - qt(0.975,fit$df)*fit$se, rev(fit$fit + qt(0.975,fit$df)*fit$se)),
+               col=tranCol(colors = 3,alpha=.5),border=NA)
+      lines( min(xlims):max(xlims), fit$fit , col = i+2)
+      lines( min(xlims):max(xlims),  fit$fit - qt(0.975,fit$df)*fit$se, col=i+2, lty=2)
+      lines( min(xlims):max(xlims), fit$fit + qt(0.975,fit$df)*fit$se, col = i+2, lty=2)
+      if(empFit){
+        fit = eval(parse(text = c('loess(Y[,EMP]~X[,EMP])','lm(Y[,EMP]~X[,EMP])','lm(Y[,EMP]~X[,EMP])')[i]))
+        fit = predict( fit, se = T )
+        polygon( c(X[,EMP],rev(X[,EMP])),  
+                 c(fit$fit - qt(0.975,fit$df)*fit$se, rev(fit$fit + qt(0.975,fit$df)*fit$se)),
+                 col=tranCol(colors = 2,alpha=.5),border=NA)
+        lines( X[,EMP], fit$fit , col = 2)
+        lines( X[,EMP],  fit$fit - qt(0.975,fit$df)*fit$se, col=2, lty=2)
+        lines( X[,EMP], fit$fit + qt(0.975,fit$df)*fit$se, col = 2, lty=2)
+      
+      }
+    }
+    }
+    
+    if(!is.null(horLine)){
+      abline(h = horLine)
+    }
+    if(grid) {
+      grid(col="#535459")  
+    }
+
+    axis(1,tick=F)
+    axis(2,tick=F)
+    title(main = tit, xlab = xLab, ylab= yLab)
+}
+
+#' Bars Plot
+#' 
+#' @param X Vector or matrix of x's
+#' @param y Vector or matrix of y's
+#' @param EMP Which column should be emphasized
+#' @param fits Add c('linear','quad','loess') fits to figure
+#' @param empFit Fit the emphasis line T or F
+#' @param xlims
+#' @param ylims
+#' @param horLine Add hor line at value of horLine
+#' @param lineType 
+#' @param grid Add a grid T or F
+#' @param tit title 
+#' @param xLab x label 
+#' @param yLab y label
+#' @return Multiple Lines on single graphe with empahasis of selected line
+#' @examples 
+#' dat = cbind(1:10,6:15,11:20)
+#' nms = c('a','b','c','d','e','f','g','h','i','k')
+#' barsPlot(DAT = dat,names=nms)
+#' barsPlot(DAT = dat,names=nms,plotly=T)
+barsPlot <- function(DAT,names,allY = NULL,decrease = T,plotly=F,yLab="",offSet = 2,col = tranCol(2,.25),botMar = 8){
+  # Author: MCKwit
+  
+  mms = data.frame(DAT)
+  whr = order(as.numeric(mms[,2]),decreasing = decrease)
+  mms = mms[whr,]
+  names = names[whr]
+  
+  if(!plotly){
+  par(mar=c(botMar,4,1,0))
+  x = 1:nrow(mms)
+  plot(x,mms[,2],ylim = c(0,max(mms[,1:3])),pch = "-",cex=1.2,bty='n',xaxt='n',
+       ylab=yLab,xlab="")
+  for(i in 1:nrow(mms)){
+    rect(i-.4,mms[i,1],i+.4,mms[i,3],col=col)
+  }
+  
+  if(!is.null(allY)){
+    abline(h = quantile(tmp,.5),lty=1, col = 3)
+    abline(h = quantile(tmp,c(.25,.75)),lty=2,col = 3)
+  }
+  par(xpd = NA)
+  delta = mms[,2] - mms[,1]
+  fit = lm(mms[,2] ~ x)
+  text(x,predict(fit)-(offSet*max(strwidth(names,units='user')) +delta) ,names,srt=90)
+  par(xpd = FALSE)
+  par(mar=c(4,4,4,4))
+  
+  }else{
+    
+    if(!require(plotly)){
+      install.packages("plotly")
+      library(plotly)
+    }
+    
+    mms = data.frame(Rank = 1:nrow(mms),mms)
+    colnames(mms) = c('Rank','Lower','Middle','Upper')
+
+    p <- plot_ly()  
+    for(i in 1:nrow(mms)){
+    
+      p <- p %>% add_polygons(
+                    x = c(mms[i,'Rank']-.4,mms[i,'Rank']+.4,mms[i,'Rank']+.4,mms[i,'Rank']-.4), 
+                    y = c(mms[i,'Upper'],mms[i,'Upper'],mms[i,'Lower'],mms[i,'Lower']),
+                    name = names[i],
+                    line = list(color = str_trunc(colorRange(i/nrow(mms),colours = palette()),7,ellipsis = "")),
+                    hoverinfo = 'text',
+                    showlegend = T,
+                    text = paste("Name: ", names[i], "<br>",
+                                 "Upper: ", mms[i,'Upper'], "<br>",
+                                 "Mid: ", mms[i,'Middle'], "<br>",
+                                 "Lower: ", mms[i,'Lower'], "<br>")
+                                
+                  )
+    }
+    p
+
+  }
+
+}
+
+
+#' Read From Server 
+#' 
+#' @param query Text string with SQL query
+#' @param server Name of server
+#' @param database Name of database
+#' @param closeafter T or F close after query is made
+#' @return Data pull using sql
+#' @examples
+#' que = "SELECT TOP 10 * FROM [STP_CMS_DW].dbo.FactOrderLine FOL with(nolock) "
+#' readDB(que)
+readDB <- function(query, server = "sqlDW",database="STPAnalyticsDev",closeAfter = T ){
+  
+  # Author: MCKwit
+  
+  if(!require(RODBC)){
+    install.packages("RODBC")
+    library(RODBC)
+  }
+  
+  connectionstring=paste( "DRIVER={SQL Server Native Client 11.0};Server=",server,
+                          ";Database=",database,";Trusted_Connection=yes",sep="")
+  ch <- odbcDriverConnect(connectionstring)
+  print("Loading...")
+  out<-sqlQuery(ch,query,stringsAsFactors = F)
+  if(closeAfter){close(ch)}
+  out
+}
+
+#' dat = read.csv("C:/Users/mkwit/Desktop/071817ALLPROMO.CSV")
+#' SaveDB(dat,'dbo.MCK_promoCustomers',database='Abacus') 
+
+SaveDB <- function(data, tableName, server = "sqlDW",database="STPAnalyticsDev",closeAfter = T ,rowNames = F, colNames = T){
+  
+  # Author: MCKwit
+  
+  if(!require(RODBC)){
+    install.packages("RODBC")
+    library(RODBC)
+  }
+  connectionstring=paste( "DRIVER={SQL Server Native Client 11.0};Server=",server,
+                          ";Database=",database,";Trusted_Connection=yes",sep="")
+  ch <- odbcDriverConnect(connectionstring)
+  sqlSave(channel = ch, dat = data,tablename = tableName, rownames = rowNames, colnames = colNames) 
+  if(closeAfter){close(ch)}
+}
+
+
+#'Random section of matrix random version of head() or tail()
+#' @param mat Vector or Matrix
+#' @param n Scalar of number of rows to print
+#' @return Random selectio nfrom mat
+#' @examples
+#' mat = matrix(rnorm(200*10),200,10)
+#' rand(mat)
+rand <- function(mat,n=10){ # random version of head
+  
+  # Author: MCKwit
+  
+  if(is.null(dim(mat))){
+    seed <- sample(1:length(mat),1)
+    xx <- mat[seed:(seed+n)]
+  }else{
+    seed <- sample(1:dim(mat)[1],1)
+    xx <- mat[seed:(seed+n),]
+    rownames(xx) <- seed:(seed+n)
+  }
+  xx
+}
+
+#' sz() combines dim() and length() into one function
+#' @param x Vector or Matrix
+#' @return The dimensions of x
+#' @examples
+#' mat = matrix(rnorm(200*10),200,10)
+#' sz(mat)
+sz <- function(x){
+  
+  # Author: MCKwit
+  
+  if(is.null(dim(x))){ 
+    length(x)
+  }else{
+    dim(x)
+  }
+}
+
+
+#' Determines the coordinates for isochromes at set distances from a focal latitude and longitude. Uses googleMaps API
+#' @param lat,lon Latitude and Longitude
+#' @param angle Angle from source to find distance (radians)
+#' @param drivetime time of isochrome
+#' @param tolerance Acceptible level of error in estimate. eg .1 is 10% of Drivetime
+#' @param maxiits Maximum number of iterations to try
+#' @param sleep Length of time to wait between queries, Google limit is 2500 per day and 5 a second
+#' @return data.frame[,c('lon'),c('lat'),c('dist')]
+#' @examples 
+#' 
+#' findDist(lat = 41.8317, lon = -88.10809,angle = 0,drivetime = 10)
+findDist <- function(lat,lon,angle, drivetime, tolerance = .1, maxits = 20,sleep=0.3){
+  
+  # Author: MCKwit
+  
+  if(!require(msm)){
+    install.packages("msm")
+    library(msm)
+  }
+  
+  if(!require(ggmap)){
+    install.packages("ggmap")
+    library(ggmap)
+  }
+  
+  lonM = lon * 86.97357 * 0.621371 #miles
+  latM = lat * 111.133 * 0.621371 #miles
+  
+  distance = uL = drivetime * 2 #Set upper limit to Start
+  lL = 0 #Lower limit Starting
+  
+  #Starting lon Lat
+  lon2 = (lonM + distance * sin(angle))/(86.97357 * 0.621371)
+  lat2 = (latM + distance * cos(angle))/(111.133 * 0.621371)
+  
+  #Iterator and test
+  calc = 0
+  iteration = 0
+ 
+  #Outout DF
+  midpoint = data.frame(lat=lat2, lon = lon2, dist = 99999)
+  
+  #Loop continues until within the tolerance
+  #or we have reached the maximum number of iterations
+  while( (abs(drivetime - calc) > tolerance*drivetime) & (iteration < maxits)){
+    
+    middist = NA
+    iterator2 = 0
+    while(is.na(middist)){
+      #use crude_distance to get lat/lon for midpoint
+      lon2 = (lonM + distance * sin(angle))/(86.97357 * 0.621371)
+      lat2 = (latM + distance * cos(angle))/(111.133 * 0.621371)
+      
+      #use mapdist to get drive time to midpoint
+      DF = try(mapdist(to=paste(lat2,lon2), from = paste(lat,lon)),silent = T)
+      if("try-error" %in% class(DF)){DF = data.frame(minutes = NA)}
+      Sys.sleep(sleep)
+      middist = DF$minutes
+      if(is.na(middist)){distance =  distance / rtnorm(1,1.25,.25,1,2)}
+      #print(c( midpoint, iteration,angle))
+      iterator2 = iterator2 + 1
+      #if(iterator2 > 20) break
+      
+      if(iterator2 %% 30 == 0){
+        if(as.numeric(distQueryCheck()) < 500) stop("Within 500 of Query Limit")
+       
+      }
+    }   
+    
+    #our new best estimate is the midpoint
+    calc <- middist
+
+    #Adjust Limits
+    if(middist < drivetime){
+      lL = distance
+    }
+    if(middist > drivetime){
+      uL = distance
+    }
+    #print(c(uL,lL,distance,midpoint))
+    #Save better guesses
+    if(abs(drivetime - middist) < abs(drivetime - midpoint$dist)){
+      midpoint = data.frame(lat=lat2, lon = lon2, dist = middist)
+    }
+    
+    #New distance guess
+    distance = rtnorm(1,(uL + lL) / 2,.25,lL,uL)
+    #increase the iteration number
+    iteration = iteration + 1
+    
+    
+    
+    if(iteration %% 20 == 0){
+      if(as.numeric(distQueryCheck()) < 500) stop("Within 500 of Query Limit")
+      
+    }
+    
+  }
+  #return best guess
+  midpoint
+}
+
+
+
+
+#'Build STP drivetime polygons and plot
+#' @param latLon Latitude and Longitude Matrix or vector
+#' @param siteName Vector of ste names for latLon
+#' @param angle Angle from source to find distance (radians)
+#' @param drivetime vector of times for isochrome
+#' @param num_angs Number of angles to check
+#' @param tolerance Acceptible level of error in estimate. eg .1 is 10% of Drivetime
+#' @param maxits Maximum number of iterations to try per angle
+#' @param sleep Length of time to wait between queries, Google limit is 2500 per day and 5 a second
+#' @param plots Creat Plots: True or False
+#' @param save Save the data: True or False
+#' @param pngSave Save the plot: : True or False
+#' @param wid width of the saved plot in Inches
+#' @param path Pathe where the save data is stored
+#' @return data.frame[,c('lon'),c('lat'),c('dist')]
+#' @examples
+#' isochrome(latLon = cbind(40.62399,-111.8538),siteName = "Example", drivetime = 10, num_angs=8, save = F,pngSave=F)
+#' isochrome(latLon = cbind(c(41.76205,41.83170), c(-87.94395,-88.10809)),siteName = c("Willowbrook","Wheaton"), drivetime = c(10,20), num_angs=6, save = F,pngSave=T)
+isochrome <- function(latLon ,siteName = NULL, drivetime = c(10), num_angs = 20, 
+                      tolerance = .1, maxits = 10, sleep=0.2, plots = T, save = T,pngSave = F,wid = 5,
+                      path = '//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/'){
+  
+  # Author: MCKwit
+  
+  latLon = as.data.frame(latLon)
+  if(length(grep('lat',colnames(latLon),ignore.case = T))!=0){
+    latLon$Latitude  = as.numeric(as.character(latLon[,grep('lat',colnames(latLon),ignore.case = T)]))
+    latLon$Longitude = as.numeric(as.character(latLon[,grep('lon',colnames(latLon),ignore.case = T)]))
+  }else{
+    latLon$Latitude  = as.numeric(as.character(latLon[,1]))
+    latLon$Longitude = as.numeric(as.character(latLon[,2]))
+  }
+  if(!is.null(siteName)){
+    rownames(latLon) = siteName 
+  }
+
+  dists <- list()
+  for(k in 1:nrow(latLon)){
+    dt = matrix(0,num_angs,0)
+    for(j in drivetime){ 
+      #set up data frame
+      tmp <- data.frame(lat=0, lon = 0, dist = 0)
+    
+      #loop over all the angles
+      for (i in 1:num_angs){
+        tmp[i,] = findDist(lat = latLon[k,'Latitude'], lon =  latLon[k,'Longitude'],
+                         angle = 0 + (i-1)/num_angs*2*pi, drivetime = j ,sleep=.1)
+        print(i)
+      }
+      plot(tmp[,1],tmp[,2])
+      colnames(tmp) = paste0(colnames(tmp),rownames(latLon)[k],'dist',j)
+      dt = cbind(dt,tmp[,1:2])
+    }
+    dists[[k]] <- dt
+    names(dists)[k] <- paste(rownames(latLon)[k],latLon[k,'Latitude'],latLon[k,'Longitude'],sep='_')
+  }
+  
+  if(save){
+    saveRDS(dists,paste0(path,'data/',paste(siteName,collapse="_"),'_driveTimes',length(list.files(paste0(path,'data/'))),'.rds'))
+    print(paste0("Data saved to: ", path, "data/"))
+  }
+
+  if(plots){
+    list.of.packages <- c("OpenStreetMap", "rgeos","rgdal")
+    new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+    if(length(new.packages)) install.packages(new.packages)
+    require(OpenStreetMap); require(rgeos); require(rgdal)
+
+    dtsp <- SpatialPoints(latLon[,c('Longitude','Latitude')],CRS("+proj=longlat +datum=WGS84"))
+    dtsp <- spTransform(dtsp, osm())
+    
+    allStore <- readDB('SELECT * FROM STPAnalyticsDev.dbo.StoreLocations')
+    allStore$col = tranCol(c('#EF8021','red','#084C61','#27562C'),alpha=.75)[match(allStore$Chain,unique(allStore$Chain))]
+    tmp <- SpatialPoints(allStore[,c('Longitude','Latitude')],CRS("+proj=longlat +datum=WGS84"))
+    tmp <- spTransform(tmp, osm())
+    allStoreSP = SpatialPointsDataFrame(tmp, data.frame(chain = allStore$Chain,col = allStore$col))
+
+    #Get Max min of lon and lat
+    tmp = do.call(rbind,lapply(dists,function(x) apply(x,2,range)))
+    mlat = range(tmp[,grep('lat',colnames(tmp))])
+    mlon = range(tmp[,grep('lon',colnames(tmp))])
+    
+    #type = c("osm", "osm-bw",
+    #         "maptoolkit-topo", "waze", "bing", "stamen-toner", "stamen-terrain",
+    #         "stamen-watercolor", "osm-german", "osm-wanderreitkarte", "mapbox", "esri",
+    #         "esri-topo", "nps", "apple-iphoto", "skobbler", "hillshade", "opencyclemap",
+    #         "osm-transport", "osm-public-transport", "osm-bbike", "osm-bbike-german")
+    map = openmap(c(lat= mlat[2]+.1,   lon = mlon[1]-.1),
+                  c(lat= mlat[1]-.1,   lon = mlon[2]+.1),type = "esri-topo")
+    if(pngSave){
+      tmp = abs(map$bbox$p1-map$bbox$p2)
+      tmp = tmp[2] * wid/tmp[1]
+      png(paste0(path,'map/',paste(siteName,collapse="_"),'_driveTime',length(list.files(paste0(path,'map/'))),'.png'),
+          width=wid, units = 'in',height = tmp, res = 128)
+    }
+    
+    plot(map)
+
+ 
+    
+    area = rep(NA,2)
+    for(k in 1:length(dists)){
+      for(i in seq(1,ncol(dists[[1]]),by=2)){
+    
+        tmp = Polygon(dists[[k]][,(i+1):i])
+        tmp = Polygons(list(tmp),ID = 'Ten')
+        tmp = SpatialPolygons(list(tmp),proj4string=CRS("+proj=longlat +datum=WGS84"))
+        tmp <- spTransform(tmp, osm())
+        area[k] = tmp@polygons[[1]]@area
+
+        if(k == 1){plot(tmp,add=T,col=rgb(.4,.4,.8,.25))}
+        if(k == 2){plot(tmp,add=T,col=rgb(.4,.8,.4,.25))}
+        if(k == 3){plot(tmp,add=T,col=rgb(.8,.4,.4,.25))}
+        
+      }
+    }
+    
+    # Set title sizes for saved png ------------------------------------
+    cx = .1;wd = 10
+    while(wd > 0){
+      wd = strwidth(paste0(paste(drivetime, collapse = " and ")," minute drive times around"),cex = cx*1.5,units = 'inches')
+      wd = wid - 1 - wd; cx = cx + .1
+    }
+    
+    # Add All stores onto map
+    points(allStoreSP,cex=2,bg=allStore$col,pch=21,col = allStore$col)
+    
+    # Add focal STP stores
+    dtsp = SpatialPointsDataFrame(dtsp, data.frame(city =rownames(latLon)))
+    points(dtsp,cex=2,bg=rgb(.9,.6,0,.5),pch=21,col = rgb(.9,.6,0,1))
+    text(x = dtsp,labels = dtsp$city,cex=.7)
+    
+    #Find intersection if there is one 
+    if(length(dists) > 1){
+      n = ncol(dists[[1]])  
+      tmp = spTransform(gIntersection(  SpatialPolygons(list(Polygons(list(Polygon(dists[[1]][,n:(n-1)])),ID = 'Ten')),proj4string=CRS("+proj=longlat +datum=WGS84")),
+                                        SpatialPolygons(list(Polygons(list(Polygon(dists[[2]][,n:(n-1)])),ID = 'Ten')),proj4string=CRS("+proj=longlat +datum=WGS84"))
+                                      )
+                  , osm())
+      are = 0
+      for(k in 1:length(tmp@polygons)){ are = are + tmp@polygons[[k]]@area}
+      plot(tmp,add=T,col=rgb(.8,.4,.4,.5))
+      
+      title(sub = paste0( round(100* are / sum(area),1), "% overlap") ,cex.sub= cx - .2,line=3)
+    }
+
+    title(main = paste0(paste(drivetime, collapse = " and "),sprintf(" minute drive times around\n"),paste(rownames(latLon), collapse = ' and '), " store(s)"),cex.main=cx)
+   
+    if(pngSave){
+      dev.off()
+      print(paste0("Map saved to: ", path, "map/"))
+    }
+    
+  }
+  return(dists)
+}
+
+
+#' Read zipped files into temp folder
+#' @param zipName names of zips file to be read
+#' @param fileName name of file in zip to read / if blank reuturns all paths
+#' @return List of Paths and file names to zipped files
+#' @examples
+#' 
+pathZip <- function(zipName,fileName = character(),PRINT = TRUE){#Function reads zip into temp folder returns paths 
+  
+  # Author: MCKwit
+  
+  #Function reads zip into temp folder 
+  #Returns path of files
+  #zipName path of zip
+  #fileName: name of files in zip to return path if blank reuturns all paths
+  zipdir = tempdir()
+  names = unzip(zipName, exdir=zipdir, list = T)
+  if(PRINT) print(names)
+  names = names[,1]
+  unzip(zipName, exdir=zipdir, list = F)
+  if(length(fileName) == 0 ) fileName = names
+  list(tmpPath = zipdir, fileNames = names, filePath = file.path(zipdir,fileName))
+}
+
+
+#' Turn list output from tapply() into matrix
+#' @param x non-ragged list to be converted into matrix
+#' @return Matrix where list names are rownames
+#' @examples
+#' index = sample(1:10,1000,replace = T)
+#' x = rnorm(1000,0,1)
+#' list2Mat(tapply(x,index,function(x)c(mean(x),median(x),sd(x))))
+list2Mat = function(x){
+  
+  # Author: MCKwit
+  
+  rnms = names(x) 
+  cnms = names(x[[1]])
+  x = matrix(unlist(x),ncol=length(x[[1]]),byrow=T)
+  rownames(x) = rnms; colnames(x) = cnms
+  x
+  
+} 
+
+
+#' Split text string into matrix of elements
+#' @param col text string
+#' @param sep where the split occurs at
+#' @return Matrix nrows = number of strings, ncols = number of elements after split
+#' @examples
+#' col = "This_will_be_split_in_six"
+#' t2C(col,sep = "_")
+t2C <- function(col,sep='/'){ #text to columns
+  
+  # Author: MCKwit
+  
+  n <- length(col)
+  vect <- unlist(strsplit(col,sep))
+  m <- length(vect)
+  matrix(vect,ncol=(m/n),byrow=T)
+}
+
+
+#'Build STP drivetime polygons and save to a list of all STP drivetimes
+#'If the polygon already exists googleAPI will not be called
+#'Polygon name is "latitude_longitude_drivetime"
+#'If running on non-stp stores CHANGE the path
+#'Lat Lon and drivetime are the unique identifier therefore they must be exact
+#' @param latLon Latitude and Longitude vector
+#' @param siteName ste names for latLon
+#' @param num_angs Number of angles to check 
+#' @param drivetime time for isochrome
+#' @param num_angs Number of angles to check
+#' @param tolerance Acceptible level of error in estimate. eg .1 is 10% of Drivetime
+#' @param maxits Maximum number of iterations to try per angle
+#' @param sleep Length of time to wait between queries, Google limit is 2500 per day and 5 a second
+#' @param path Path where the save data is stored
+#' @return saves spatial //stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/data/driveTimePolygons.rds
+#' @examples
+#' isochromeShapes(latLon = cbind(41.463603,-81.48134),siteName = "Woodmere", drivetime = 20)
+isochromeShapes <- function(latLon ,siteName = NULL, drivetime = 10, num_angs=NULL, 
+                            tolerance = .1, maxits = 10, sleep=0.25,
+                            path = '//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/'){
+  
+  # Author: MCKwit
+  
+  list.of.packages <- c("OpenStreetMap", "rgeos","rgdal","ggmap")
+  new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+  if(length(new.packages)) install.packages(new.packages)
+  require(OpenStreetMap); require(rgeos); require(rgdal)
+  
+  SAVE = T
+  
+  if(is.null(num_angs)){
+    num_angs = 20
+    if(drivetime >= 30){num_angs = 30}
+    if(drivetime >= 40){num_angs = 40}
+  }
+  
+  latLon = as.data.frame(latLon)
+  if(length(grep('lat',colnames(latLon),ignore.case = T))!=0){
+    latLon$Latitude  = as.numeric(as.character(latLon[,grep('lat',colnames(latLon),ignore.case = T)]))
+    latLon$Longitude = as.numeric(as.character(latLon[,grep('lon',colnames(latLon),ignore.case = T)]))
+  }else{
+    latLon$Latitude  = as.numeric(as.character(latLon[,1]))
+    latLon$Longitude = as.numeric(as.character(latLon[,2]))
+  }
+  if(!is.null(siteName)){
+    rownames(latLon) = siteName 
+  }
+  
+  if(length(list.files(paste0(path,'data'),pattern = 'driveTimePolygons.rds')) >= 1){
+    file = readRDS(paste0(path,'data/driveTimePolygons.rds'))
+  }else{
+    file = SpatialPolygons(list(),proj4string=CRS("+proj=longlat +datum=WGS84")) 
+  }
+  if(!(paste(latLon$Latitude,latLon$Longitude,drivetime,sep="_") %in% names(file))){  
+    
+    #set up data frame
+    dists <- data.frame(Latitude=0, Longitude = 0, Distance = 0)
+    
+    #loop over all the angles
+    for (i in 1:num_angs){
+      dists[i,] = findDist(lat = latLon[1,'Latitude'], lon =  latLon[1,'Longitude'],
+                           angle = 0 + (i-1)/num_angs*2*pi, drivetime = drivetime ,sleep=sleep)
+      if(as.numeric(distQueryCheck()) < 500){SAVE = F; stop("Within 500 of Query Limit")}
+    }
+    tmp = Polygon(dists[,c('Longitude','Latitude')]) #wants in Lon Lat
+    tmp = Polygons(list(tmp),ID =  paste(latLon[1,'Latitude'],latLon[1,'Longitude'],drivetime,sep='_'))
+    tmp = SpatialPolygons(list(tmp),proj4string=CRS("+proj=longlat +datum=WGS84"))
+    #tmp <- spTransform(tmp, osm())
+    file = rbind(file,tmp)
+  }
+  if(SAVE){
+    saveRDS(file,paste0(path,'/data/driveTimePolygons.rds'))
+    print(paste0("Data saved to: ", path, "data/"))
+  }
+}  
+
+
+#'Build STP drivetime polygons and save to a list of all STP drivetimes
+#'If the polygon already exists googleAPI will not be called
+#'Polygon name is "latitude_longitude_drivetime"
+#'If running on non-stp stores CHANGE the path
+#'Lat Lon and drivetime are the unique identifier therefore they must be exact
+#' @param latLon Latitude and Longitude vector
+#' @param siteName ste names for latLon
+#' @param num_angs Number of angles to check 
+#' @param drivetime time for isochrome
+#' @param num_angs Number of angles to check
+#' @param tolerance Acceptible level of error in estimate. eg .1 is 10% of Drivetime
+#' @param maxits Maximum number of iterations to try per angle
+#' @param sleep Length of time to wait between queries, Google limit is 2500 per day and 5 a second
+#' @param path Path where the save data is stored
+#' @return saves spatial //stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/data/driveTimePolygons.rds
+#' @examples
+#' isochromeShapes(latLon = cbind(41.83170,88.10809),siteName = "Wheaton", drivetime = 10)
+isochromeShapesTJX <- function(latLon ,siteName = NULL, drivetime = 10, num_angs=NULL, 
+                            tolerance = .1, maxits = 10, sleep=0.25,
+                            path = '//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/'){
+  
+  # Author: MCKwit
+  
+  list.of.packages <- c("OpenStreetMap", "rgeos","rgdal","ggmap")
+  new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+  if(length(new.packages)) install.packages(new.packages)
+  require(OpenStreetMap); require(rgeos); require(rgdal)
+  
+  SAVE = T
+  
+  if(is.null(num_angs)){
+    num_angs = 20
+    if(drivetime >= 30){num_angs = 30}
+    if(drivetime >= 40){num_angs = 40}
+  }
+  
+  latLon = as.data.frame(latLon)
+  if(length(grep('lat',colnames(latLon),ignore.case = T))!=0){
+    latLon$Latitude  = as.numeric(as.character(latLon[,grep('lat',colnames(latLon),ignore.case = T)]))
+    latLon$Longitude = as.numeric(as.character(latLon[,grep('lon',colnames(latLon),ignore.case = T)]))
+  }else{
+    latLon$Latitude  = as.numeric(as.character(latLon[,1]))
+    latLon$Longitude = as.numeric(as.character(latLon[,2]))
+  }
+  #if(!is.null(siteName)){
+  #  rownames(latLon) = siteName 
+  #}
+  
+  if(length(list.files(paste0(path,'data'),pattern = 'TJXdriveTimePolygons.rds')) == 1){
+    file = readRDS(paste0(path,'data/TJXdriveTimePolygons.rds'))
+  }else{
+    file = SpatialPolygons(list(),proj4string=CRS("+proj=longlat +datum=WGS84")) 
+  }
+  if(!(paste(latLon$Latitude,latLon$Longitude,drivetime,sep="_") %in% names(file))){  
+    
+    #set up data frame
+    dists <- data.frame(Latitude=0, Longitude = 0, Distance = 0)
+    
+    #loop over all the angles
+    for (i in 1:num_angs){
+      if(as.numeric(distQueryCheck()) < 500){SAVE = F; stop("Within 500 of Query Limit")}
+      dists[i,] = findDist(lat = latLon[1,'Latitude'], lon =  latLon[1,'Longitude'],
+                           angle = 0 + (i-1)/num_angs*2*pi, drivetime = drivetime ,sleep=sleep)
+    }
+    tmp = Polygon(dists[,c('Longitude','Latitude')]) #wants in Lon Lat
+    tmp = Polygons(list(tmp),ID =  paste(latLon[1,'Latitude'],latLon[1,'Longitude'],drivetime,sep='_'))
+    tmp = SpatialPolygons(list(tmp),proj4string=CRS("+proj=longlat +datum=WGS84"))
+    #tmp <- spTransform(tmp, osm())
+    file = rbind(file,tmp)
+  }
+  if(SAVE){
+    saveRDS(file,paste0(path,'/data/TJXdriveTimePolygons.rds'))
+    print(paste0("Data saved to: ", path, "data/"))
+  }
+}  
+
+#' distance provides the distance between an n-dimensional coordinate and a l X n matrix
+#'
+#' @param valM value of a single coordinate
+#' @param M matrix of coordinates to compare valM to 
+#' @param SQROOT If FALSE squared distance is returned (slight computational advantage if absolute distance is not important)
+#' @return distnace vector of length l 
+#' @examples
+#' x = c(10,10)
+#' X = matrix(rnorm(100,10,1),ncol=2)
+#' distance(x,X)
+distance = function(valM,M,SQROOT = T){
+  
+  # Author: MCKwit
+  
+  valM = rbind(valM)
+  dims = ncol(valM)
+  resp = rep(0,dim(M)[1])
+  for(i in 1:dims){
+    resp = resp + (M[,i]-valM[,i])^2
+  }
+  if(SQROOT){
+    sqrt(resp)
+  }else{
+    resp
+  }
+}
+
+#' colorRange provides a range of colors for displaying continuous data
+#'
+#' @param percent [0,1] magnitude of the color to be displayed 
+#' @param colours vector of colors for color spectrum
+#' @param trans [0,1] level of transparency
+#' @return Returns colors allong a spectrum of the given colors 0 is first color and 1 the last
+#' @examples
+#' colorRange(percent = c(.1,.5,.9))
+#' colorRange(percent = c(.1,.5,.9),colours = c('red','blue'),trans = .5)
+colorRange <- function(percent = .5,colours = c('#AF2F03','white','#027A40'),trans = 1){
+  
+  # Author: MCKwit
+  
+  #cols = rgb2hsv(col2rgb(colours))
+  cols = col2rgb(colours)/256
+  ncolours = length(colours)
+  whr = percent*(ncol(cols)-1)+1
+  whr.lo = floor(whr)
+  whr.hi = ceiling(whr)
+  return(
+    rgb( #hsv
+      (ncolours - 1)*(percent - (whr.lo-1)/(ncolours - 1)) * (cols[1,whr.hi] - cols[1,whr.lo]) + cols[1,whr.lo],
+      (ncolours - 1)*(percent - (whr.lo-1)/(ncolours - 1)) * (cols[2,whr.hi] - cols[2,whr.lo]) + cols[2,whr.lo],
+      (ncolours - 1)*(percent - (whr.lo-1)/(ncolours - 1)) * (cols[3,whr.hi] - cols[3,whr.lo]) + cols[3,whr.lo],
+      trans
+    )
+  )
+}
+
+#' luhn Chaeck to validate a credit card number
+#' can be used to identify and eliminate CC numbers from data
+#'
+#' @param cardNum Credit card number to be checked
+#' @return True / False is valid card number
+#' @examples
+#' cardNum = 79927398713
+#' luhnCheck(cardNum)
+luhnCheck <- function(cardNum){
+  
+  # Author: MCKwit
+  
+  cardNum = as.character(cardNum)
+  cardNum = unlist(strsplit(cardNum,""))
+  checkDigit = as.numeric(cardNum[length(cardNum)])
+  cardNum = cardNum[-length(cardNum)]
+  n = length(cardNum)
+  odd = cardNum[seq(n,1,by = -2)]
+  even = cardNum[seq(n-1,1,by = -2)]
+  total = sum(as.numeric(even)) + sum(as.numeric(unlist(strsplit(as.character(2*as.numeric(odd)),""))))
+  (total + checkDigit) %% 10 == 0
+}
+
+
+#'percent overlap of pop a and b
+#'
+#' @param a,b What percent do two poulations overlap
+#' @return Overlap =  #how much overlap between 95% and other distribution twice
+#' @return aOverb how much of a is greater than 5%b
+#' @return bOvera how much of b is less than 95%a
+#' @return overlap95 how much overlap between 95% and 95% of other distribution
+#' @return probOverlap probabilty a sample overlaps
+#' @return sampOver 
+#' @examples 
+#' a = rnorm(1000,0,10)
+#' b = rnorm(1000,30,10)
+#' hist(a,col=rgb(.4,.4,.8,.4),xlim = c(-50,100));hist(b,add=T,col=rgb(.8,.4,.4,.4))
+#' overlap(a,b)
+overlap = function(a,b){
+  
+  # Author: MCKwit
+  
+  n = max(length(a),length(b),10000)
+  a = sample(a,n,replace = T) #make samples equal size
+  b = sample(b,n,replace = T)
+  a95 = quantile(a,.95)
+  b95 = quantile(b,.05)
+  c = c(a,b)
+  overlap = (length(which(b95 < a ))+length(which(b < a95 ))) / length(c) #how much overlap between 95% and other distribution twice
+  aOverB = length(which(b95 < a )) / length(a) #how much of a is greater than 5%b
+  bOverA = length(which(b < a95 )) / length(b) #how much of b is less than 95%a
+  overlap95 = (length(which(b95 < c & c < a95 ))) / length(c) #how much overlap between 95% and 95% of other distribution
+  
+  list(overlap = overlap,aOverB = aOverB,bOverA = bOverA,
+       overlap95 = overlap95, probOverlap = aOverB*bOverA, sampOver = 1- (length(which(a<b))/length(a)))
+}
+
+#'fiscal week to fiscal month
+#' @param fiscal week number
+#' @return fiscal month
+#' @examples
+#' fWk2fMon(22)
+fWk2fMon <- function(weekNum){
+  
+  # Author: MCKwit
+
+    c(rep(1:12,rep(c(4,5,4),4)),12)[weekNum]
+  
+} 
+
+
+#' From calander date provide fiscal (year,doy,week,month)
+#' @param date yyyy-mm-dd %Y-%m-%d
+#' @return fiscal year, day of year,week,month
+#' @examples
+#date = c("2017-03-01","2015-03-01","2020-08-01")
+#date2Fiscal(date)
+date2Fiscal <- function(date, format = "%Y-%m-%d"){
+  
+  # Author: MCKwit
+  
+  date = as.Date(date,format)
+  yrs = 1999:2035
+  weeks = rep(52,length(yrs))
+  weeks[match(c(2004,2009,2013,2018,2024,2029,2035),yrs)] = 53
+  dates = as.Date(c("1998-02-01","1999-01-31","2000-01-30","2001-01-28","2002-01-27","2003-01-26","2004-02-01","2005-01-30",
+          "2006-01-29","2007-01-28","2008-01-27","2009-02-01","2010-01-31","2011-01-30","2012-01-29","2013-02-03",
+          "2014-02-02","2015-02-01","2016-01-31","2017-01-29","2018-02-04","2019-02-03","2020-02-02","2021-01-31",
+          "2022-01-30","2023-01-29","2024-02-04","2025-02-02","2026-02-01","2027-01-31","2028-01-30","2029-02-04",
+          "2030-02-03","2031-02-02","2032-02-01","2033-01-30","2034-01-29"))
+  
+  whr = unlist(lapply(date,function(x) max(which(dates <= x))))
+  
+  fDoy = as.numeric(difftime(date,dates[whr],units = 'days')) + 1
+  fDoy[is.na(fDoy)] = 1
+  
+  fWeek = unlist(lapply(1:length(whr),function(x) ceiling(fDoy[x]/7) ))
+  
+  fMonth = c(rep(1:12,rep(c(4,5,4),4)),12)[fWeek]
+  
+  fquarter = rep(1,length(fMonth)) 
+  fquarter[fMonth %in% c(4,5,6)] = 2 
+  fquarter[fMonth %in% c(7,8,9)] = 3 
+  fquarter[fMonth %in% c(10,11,12)] = 4 
+  
+  list(year = yrs[whr],doy = fDoy,week = fWeek,month = fMonth, quarter = fquarter) 
+  
+}
+
+#' Convert Fiscal DOY Year to calendar date
+#' @param fiscalDOY fiscal Day of Year
+#' @param fiscalYear fiscal year
+#' @examples 
+#' fiscal2Date(222,2017)
+fiscal2Date = function(fiscalDOY,fiscalYear){
+  
+  # Author: MCKwit
+  
+  dates = c("1998-02-01","1999-01-31","2000-01-30","2001-01-28","2002-01-27","2003-01-26","2004-02-01","2005-01-30",
+                    "2006-01-29","2007-01-28","2008-01-27","2009-02-01","2010-01-31","2011-01-30","2012-01-29","2013-02-03",
+                    "2014-02-02","2015-02-01","2016-01-31","2017-01-29","2018-02-04","2019-02-03","2020-02-02","2021-01-31",
+                    "2022-01-30","2023-01-29","2024-02-04","2025-02-02","2026-02-01","2027-01-31","2028-01-30","2029-02-04",
+                    "2030-02-03","2031-02-02","2032-02-01","2033-01-30","2034-01-29")
+  
+  as.Date(dates[match(fiscalYear-1,t2C(dates,sep="-")[,1])]) + fiscalDOY - 1
+
+}
+
+
+#' Provide list of zipcodes within "dist" of focal zipcodes
+#' @param zipcodes vector of zipcodes of interest
+#' @param dist radius for zipcode search in miles
+#' @param combine combine into one list or create a list by each focal zipcode (T or F)
+#' @return data.frame of zipcodes
+#' @examples
+#' zipsWithinDist(c(60457,80521,61820,27704),COMBINE=F)
+#' zipsWithinDist(c(60457,80521,61820,27704),COMBINE=T)
+zipsWithinDist = function(zipcodes,dist=25,COMBINE = T){
+  
+  # Author: MCKwit
+  
+  zips = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/forFunctions/zipLocations_2016.rds')
+  zips$ZIP =  str_pad(zips$ZIP,width = 5,pad = '0')
+  zipcodes = str_pad(zipcodes,width = 5,pad = '0')
+  whr = match(zipcodes,zips$ZIP)
+  out  = lapply(whr,function(x) zips$ZIP[which(distance(cbind(zips$lon_Km,zips$lat_Km)[x,],cbind(zips$lon_Km,zips$lat_Km)) * 0.621371 < dist )] )
+  centerZip = rep(zipcodes,times = unlist(lapply(out,length)))
+  out = data.frame(centerZip,allZip = unlist(out))
+  if(COMBINE){
+    out = data.frame(allZip = unique(out[,'allZip']))
+  }
+  out
+}
+
+
+#' Approximates degree into miles by latitude
+#'
+#' latitude = c(-120,45)
+#' degreeInMiles(lonLat,lonLatMat)
+degreeInMiles = function(latitude){
+  
+  # Author: MCKwit
+  
+  lon = cos((latitude/360) * 2 * pi ) * 69.172 
+  lat = 69
+  data.frame(mileLong = lon, mileLat = lat)
+}
+
+#' Calculates the distAnce in miles between degreeas latitude
+#'
+#' lonLat = c(-120,45)
+#' lonLatMat = rbind(c(-130,25),c(-130,45),c(-120,55))
+#' distLonLat(lonLat,lonLatMat)
+distLonLat <- function(lonLat, lonLatMat){
+  
+  # Author: MCKwit
+  
+  lonLat = matrix(lonLat,ncol = 2)
+  out = lapply(1:nrow(lonLatMat), function(x){
+    sqrt( mean((lonLatMat[x,1] - lonLat[,1]) * degreeInMiles(seq(lonLatMat[x,2],lonLat[,2], length = 1000))$mileLong)^2 + 
+         ((lonLatMat[x,2] - lonLat[,2]) * 69) ^2 )
+  } )
+ 
+  unlist(out)
+  
+}
+
+#' Calculates the distAnce in miles between degreeas latitude
+#'
+#' lonLat = c(-120,45)
+#' lonLatMat = rbind(c(-130,25),c(-130,45),c(-120,55))
+#' distLonLat(lonLat,lonLatMat)
+distLonLat <- function(lonLat, lonLatMat){
+  
+  # Author: MCKwit
+  
+  loadPack(c("doParallel","foreach"))
+  #registerDoParallel()
+  lonLat = matrix(lonLat,ncol = 2)
+  dd = function(x){
+    sqrt( mean((lonLatMat[x,1] - lonLat[,1]) * degreeInMiles(seq(lonLatMat[x,2],lonLat[,2], length = 1000))$mileLong)^2 + 
+            ((lonLatMat[x,2] - lonLat[,2]) * 69) ^2 )
+  }
+  out = foreach(i = 1:nrow(lonLatMat),.combine = "c") %dopar% dd(i)
+  out
+}
+
+#' Provide list of zipcodes within "dist" of focal zipcodes
+#' @param zipcodes vector of zipcodes of interest
+#' @param dist radius for zipcode search in miles
+#' @param combine combine into one list or create a list by each focal zipcode (T or F)
+#' @return data.frame of zipcodes and distances
+#' @examples
+#' location = cbind(-105,40.58)
+#' location = rbind(60457,80521,61820,27704)
+#' zipsWithinDist2(location,COMBINE=F)
+#' zipsWithinDist2(location,COMBINE=T)
+zipsWithinDist2 = function(location,dis=25,COMBINE = T){
+  
+  # Author: MCKwit
+  
+  if(!require(stringr)){
+    install.packages("stringr")
+    library(stringr)
+  }
+  zips = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/forFunctions/zipLocations_2016.rds')
+  zips$ZIP =  str_pad(zips$ZIP,width = 5,pad = '0')
+  
+  if(is.null(dim(location))) print("zips must be nX1 and lonLat nX2 matrix or data.frame")
+  
+  if(ncol(location) == 1){
+    location = names = str_pad(location,width = 5,pad = '0')
+    location = zips[match(location,zips$ZIP),c('lon','lat')]
+  }else{ 
+    names = apply(location,1,paste , collapse = ", ") 
+  }
+  
+  out  = lapply(1:nrow(location), 
+                function(x){ 
+                  distances = 
+                    distLonLat(
+                      cbind(as.numeric(location[x,1]),as.numeric(location[x,2])),
+                      cbind(as.numeric(zips[,'lon']),as.numeric(zips[,'lat'])) 
+                    );
+                  cbind(zips$ZIP[distances < dis],distances[distances < dis]) }
+  )
+  
+  centerZip = rep(names,times = unlist(lapply(out,nrow)))
+  out = data.frame(centerZip,do.call(rbind,out))
+  colnames(out) = c('centerZip','allZip','distance')
+  if(COMBINE){
+    out = data.frame(allZip = unique(out[,'allZip']))
+  }
+  #zipTrans <- read.csv('//stp-file1/groups/DataModelingAndAnalytics/MCK/zip_to_zcta_2016.csv',stringsAsFactors=F)
+  #whr = match(zipTrans$ZCTA_USE,out$allZip)
+  #whr = which(!is.na(whr))
+  #zipTrans[whr,'ZIP']
+  out
+}
+
+
+#' Easy pretty axis
+prettyAxis <- function(side = 2, tick = F,lim = lim,numTicks = 5,digits = NULL, GRID = F){
+  
+  # Author: MCKwit
+  
+  at = seq(lim[1],lim[2],by = diff(lim)/numTicks)
+  labels = formatNum(round(at,-str_length(round(at,0))+2),digits = digits)
+  axis(side = side,tick=tick,at = at , labels = labels)
+  if (GRID == T) {
+    if (side == 1){
+      abline(v = at, col = 'lightgrey',lty=3)
+    } else {
+      abline(h = at, col = 'lightgrey',lty=3)
+    }
+  }
+}
+
+#' Paste , , , and 
+#' pasteAnd(c('Tracy','Joe','Matt'))
+pasteAnd = function(x){
+  
+  # Author: MCKwit
+  
+  n = length(x)
+  out = x
+  if(n != 1){
+    out = paste(x[-n],collapse = ", ")
+    out = paste(c(out,x[n]),collapse = ", and ")
+  }
+  out
+}
+
+
+greatCircleDistance <- function(long1, lat1, long2, lat2) {
+  
+  # Author: MCKwit
+  
+  R <- 6371 # Earth mean radius [km]
+  delta.long <- (long2 - long1)
+  delta.lat <- (lat2 - lat1)
+  a <- sin(delta.lat/2)^2 + cos(lat1) * cos(lat2) * sin(delta.long/2)^2
+  c <- 2 * asin(min(1,sqrt(a)))
+  d = R * c
+  return(d) # Distance in km
+}
+
+
+#' Openxlsx style wrapper
+#' @param 
+#' input = 
+#'  list(
+#'    dims  = c(12,12),
+#'    bty = T,
+#'    double = list(rows = c(3,9),cols = c(3,9)),
+#'    thin = list(rows = c(6),cols = c(6)),
+#'    fill = list(rows = c(2,5,8,11),cols = c(2,5,8,11),color = "#F9FAF1"),
+#'    bold = list(rows = c(3,9),cols = c(3,9)),
+#'    halign_left = list(rows = c(6),cols = c(6))
+#'  )
+
+xlBox <- function(wb,sheet = 1,input, start = c(1,1)){
+  
+  # Author: MCKwit
+  
+  require("openxlsx")
+  dims = input$dims - 1 #Adjust to be in correct location
+  
+  lStyles = c("none","thin","medium","dashed","dotted","thick","double",
+              "hair","mediumDashed","dashDot","mediumDashDot","dashDotDot",
+              "mediumDashDotDot","slantDashDot") 
+  whr = which(names(input) %in% lStyles)
+  for(i in whr){
+    
+    rc = input[[i]]
+    if(!is.na(rc[[2]][1])){
+      style = createStyle(border = "Left",borderStyle = names(input)[i]) #Left Border
+      addStyle(wb,sheet = sheet, style = style, rows = start[1]:(start[1] + dims[1]), cols = rc[[2]] + start[2], gridExpand = TRUE, stack = T)
+    }
+    if(!is.na(rc[[1]][1])){
+      style = createStyle(border = "Top",borderStyle = names(input)[i]) #Top Border
+      addStyle(wb,sheet = sheet, style = style, rows = rc[[1]] + start[1], cols = start[2]:(start[2] + dims[2]), gridExpand = TRUE, stack = T)
+    }
+    print(paste("added", names(input)[i]))
+  }
+  
+  lStyles = c("fill")
+  whr = which(names(input) %in% lStyles)
+  for(i in whr){
+    
+    rc = input[[i]]
+    style = createStyle(fgFill = input[[i]][[3]])
+    if(!is.na(rc[[2]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = start[1]:(start[1] + dims[1]),cols = rc[[2]] + start[2] - 1,gridExpand = TRUE,stack=T)
+    }
+    if(!is.na(rc[[1]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = rc[[1]] + start[1]-1,cols = start[2]:(start[2] + dims[2]),gridExpand = TRUE,stack=T)
+    }
+    print(paste("added", names(input)[i]))
+  }
+  
+  lStyles = c("GENERAL","NUMBER","CURRENCY","ACCOUNTING","DATE",
+              "LONGDATE","TIME","PERCENTAGE","FRACTION","SCIENTIFIC",
+              "TEXT","COMMA")
+  whr = which(names(input) %in% lStyles)
+  for(i in whr){
+    
+    rc = input[[i]]
+    style = createStyle(numFmt = names(input)[i])
+    if(!is.na(rc[[2]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = start[1]:(start[1] + dims[1]),cols = rc[[2]] + start[2] - 1,gridExpand = TRUE,stack=T)
+    }
+    if(!is.na(rc[[1]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = rc[[1]] + start[1]-1,cols = start[2]:(start[2] + dims[2]),gridExpand = TRUE,stack=T)
+    }
+    print(paste("added", names(input)[i]))
+  }
+  
+  lStyles = c("bold","strikeout","italic","underline","underline2")
+  whr = which(names(input) %in% lStyles)
+  for(i in whr){
+    rc = input[[i]]
+    style = createStyle(textDecoration = names(input)[i])
+    if(!is.na(rc[[2]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = start[1]:(start[1] + dims[1]),cols = rc[[2]] + start[2] - 1,gridExpand = TRUE,stack=T)
+    }
+    if(!is.na(rc[[1]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = rc[[1]] + start[1]-1,cols = start[2]:(start[2] + dims[2]),gridExpand = TRUE,stack=T)
+    }
+    print(paste("added", names(input)[i]))
+  }
+  
+  lStyles = c("halign_left","halign_center","halign_right")
+  whr = which(names(input) %in% lStyles)
+  for(i in whr){
+    rc = input[[i]]
+    style = createStyle( halign = t2C(names(input)[i],sep="_")[1,2])
+    if(!is.na(rc[[2]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = start[1]:(start[1] + dims[1]),cols = rc[[2]] + start[2] - 1,gridExpand = TRUE,stack=T)
+    }
+    if(!is.na(rc[[1]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = rc[[1]] + start[1]-1,cols = start[2]:(start[2] + dims[2]),gridExpand = TRUE,stack=T)
+    }
+    print(paste("added", names(input)[i]))
+  }
+  
+  lStyles = c("valign_top","valign_center","valign_bottom")
+  whr = which(names(input) %in% lStyles)
+  for(i in whr){
+    rc = input[[i]]
+    style = createStyle( valign = t2C(names(input)[i],sep="_")[1,2])
+    if(!is.na(rc[[2]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = start[1]:(start[1] + dims[1]),cols = rc[[2]] + start[2] - 1,gridExpand = TRUE,stack=T)
+    }
+    if(!is.na(rc[[1]][1])){
+      addStyle(wb,sheet = sheet, style = style,rows = rc[[1]] + start[1]-1,cols = start[2]:(start[2] + dims[2]),gridExpand = TRUE,stack=T)
+    }
+    print(paste("added", names(input)[i]))
+  }
+  
+  #BOX -----------------------------------
+  whr = which(names(input) %in% 'bty')
+  bty = "medium"
+  if(input[[whr]]){
+    style = createStyle(border = "Left",borderStyle = bty) #Left Border
+    addStyle(wb,sheet = sheet, style = style, rows = start[1]:(start[1] + dims[1]), cols = start[2], gridExpand = TRUE, stack = T)
+    style = createStyle(border = "Right",borderStyle = bty) #Right Border
+    addStyle(wb,sheet = sheet, style = style, rows = start[1]:(start[1] + dims[1]), cols = start[2] + dims[2], gridExpand = TRUE, stack = T)
+    style = createStyle(border = "Top",borderStyle = bty) #Top Border
+    addStyle(wb,sheet = sheet, style = style, rows = start[1], cols = start[2]:(start[2] + dims[2]), gridExpand = TRUE, stack = T)
+    style = createStyle(border = "Bottom",borderStyle = bty) #Bottom Border
+    addStyle(wb,sheet = sheet, style = style, rows = start[1] + dims[1], cols = start[2]:(start[2] + dims[2]), gridExpand = TRUE, stack = T)
+    print(paste("added", names(input)[whr]))
+  }
+}
+
+#' Remove leading and trailing spaces
+#' @examples trim(c(' Tracy','Joe ',' Matt '))
+trim <- function (x) {
+  # Author: MCKwit
+  gsub("^\\s+|\\s+$", "", x)
+}
+
+#' convert camel case to camelCase
+#' @examples camel(c('Tracy Joe Matt'), sep = " ")
+camel <- function(x,sep="\\."){
+  # Author: MCKwit
+  
+  firstUp = function(x){paste0(toupper(str_sub(x,start = 1,end = 1)),sub('.', '', x))}
+  out = tolower(x)
+  whr = grep(sep,x)
+  x = lapply(x[whr],function(x){ paste(firstUp(t2C(x,sep=sep)),collapse = "") } ) 
+  x = paste0(tolower(str_sub(x,start = 1,end = 1)),sub('.', '', x))
+  out[whr] = x
+  out
+}
+
+#' pad number or string with zeros to become zipcode
+as.zip = function(x){
+  # Author: MCKwit
+  str_pad(x,width = 5, pad = "0" )  
+}
+
+#' equivalent to rbind.fill from dplyr
+cbind.fill <- function(...) {  
+  # Author: MCKwit
+  require(plyr)
+  transpoted <- lapply(list(...),t)                                                                                                                                                 
+  transpoted_dataframe <- lapply(transpoted, as.data.frame)                                                                                                                         
+  return (data.frame(t(rbind.fill(transpoted_dataframe))))                                                                                                                          
+} 
+
+
+#' @examples X = cbind(d$webSale,d$totalPop,as.numeric(d$medHouInc))
+#' @examples plot(d$reSales,predSales(d$distance,X))
+predSales = function(distance = distance,X=cbind(webSales,totalPop, as.numeric(medHouInc)) ){
+  # Author: MCKwit
+  x = distance
+  B = c(2.513600189,0.132771114,0.001974228)
+  off= X %*% B 
+  weib = function(a = 0.938002995, b = 3.812395238,off = off){off * (a/b)*(x/b)^(a-1)*exp(-(x/b)^a)}
+  weib(off = off) 
+}
+
+
+#'predLLSales(c(-104.941406,40.241274))
+predLLSales = function(lonLat){
+  # Author: MCKwit
+  
+  allDat = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/fittedCenDataSales.rds')
+  allDat = allDat[distance(valM = lonLat, M = cbind(as.numeric(allDat[,'INTPTLON']),as.numeric(allDat[,'INTPTLAT']))) < 100/70,]
+  allDat$distance = distLonLat(lonLat = lonLat, lonLatMat = cbind(as.numeric(allDat[,'INTPTLON']),as.numeric(allDat[,'INTPTLAT'])))
+  allDat$predSales = predSales(distance = allDat$distance,X=cbind(allDat$scalProf,allDat$totalPop, as.numeric(allDat$medHouInc)))
+  allDat
+}
+
+
+#' Head and Tail Breaks For Classification
+#' @examples x = c(19, 8, 7, 6, 2, NA,1, 1, 1, 0,NA)
+#' @examples htBreaks(x)
+#'
+htBreaks <- function(x){
+  # Author: MCKwit
+  
+  hold = x
+  whr = is.na(x)
+  vect = x[!whr]
+  out = min(x,na.rm=T)
+  pct = 1
+  while( (pct) >= .4){
+    tot = sum(x,na.rm=T)
+    out=c(mean(x,na.rm=T),out)
+    x = x[x > mean(x,na.rm=T)]
+    if(length(x) <= 1) break
+    pct = sum(x,na.rm=T)/tot
+    #print(head/tot)
+  }
+
+  if(length(out) == 1){ outl = rep(1,length(vect))
+  }else{
+  outl = rep(1,length(vect))  
+  for(i in 1:length(out)){
+    outl[which(vect < out[i])] = i+1
+  }
+  }
+  hold[!whr] = outl 
+ 
+  list( breaks = c(max(x,na.rm=T),out),classes =  hold)  
+  
+}
+
+
+#' return column number of excel sheet given letter designation
+#' @param cols letters on columns needed to index
+#' @examples xL(c('a','aa','m','c','k'))
+xL = function(cols){
+  # Author: MCKwit
+  which(c('a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
+    'aa','ab','ac','ad','ae','af','ag','ah','ai','aj','ak','al','am','an','ao','ap','aq','ar','as','at','au','av','aw','ax','ay','az',
+    'ba','bb','bc','bd','be','bf','bg','bh','bi','bj','bk','bl','bm','bn','bo','bp','bq','br','bs','bt','bu','bv','bw','bx','by','bz',
+    'ca','cb','cc','cd','ce','cf','cg','ch','ci','cj','ck','cl','cm','cn','co','cp','cq','cr','cs','ct','cu','cv','cw','cx','cy','cz',
+    'da','db','dc','dd','de','df','dg','dh','di','dj','dk','dl','dm','dn','do','dp','dq','dr','ds','dt','du','dv','dw','dx','dy','dz') %in% cols)
+}
+
+
+
+
+#' polar to cartesian coordinates
+#' @param angle angle from center top = 0
+#' @param radius radius from center
+#' @param inner.c add an inner circle
+polar2cart <- function(angle,radius,inner.c=0){#angle in degrees adds an inner radius
+  # Author: MCKwit
+  
+  if(length(radius) == 1){radius = rep(radius,length(angle))}
+  radius <- radius + inner.c
+  angle[angle > 360] = angle[angle > 360] -360
+  angle[angle < 0] = angle[angle < 0] + 360
+  x = angle; y = angle
+  whr = angle <= 90
+  x[whr] = radius[whr]*sin(angle[whr]*2*pi/360)
+  y[whr] = radius[whr]*cos(angle[whr]*2*pi/360)
+  
+  whr = 90 < angle & angle <= 180
+  x[whr] = radius[whr]*cos((angle[whr]-90)*2*pi/360)
+  y[whr] = -radius[whr]*sin((angle[whr]-90)*2*pi/360)
+  
+  whr = 180 < angle & angle <= 270
+  x[whr] = -radius[whr]*sin((angle[whr]-180)*2*pi/360)
+  y[whr] = -radius[whr]*cos((angle[whr]-180)*2*pi/360)
+  
+  whr = 270 < angle & angle <= 360
+  x[whr] = -radius[whr]*cos((angle[whr]-270)*2*pi/360)
+  y[whr] = radius[whr]*sin((angle[whr]-270)*2*pi/360)
+  
+  list(x=x,y=y)
+}
+
+
+#' comparative pie chart
+#' @examples input = cbind(c(50,20,5,3),c(40,20,2,99))
+#' @examples rownames(input) = c('Reactivated','Existing','New','New Returning')
+#' @examples colnames(input) = c('FY18','FY17')
+#' @examples compPieBalanced(input) 
+compPieBalanced <- function(input){
+  # Author: MCKwit
+  
+  par(pty = 's')
+  plot(0,0,xlim = c(-1,1),ylim = c(-1,1),type='n',bty='n',
+       xaxt='n',yaxt='n',xlab="",ylab="")
+  input = cbind(input,cols = 1:nrow(input))
+  input = input[order(input[,1],decreasing = T),]
+  cols = input[,'cols']
+  pcts = tmp = input / matrix(apply(input,2,sum),nrow= nrow(input),ncol=ncol(input),byrow=T)
+  pcts = 360 * pcts /3.5
+  startAngles = c(270,90) + 90 - sum(pcts[,1])/2
+  
+  for(i in 1:nrow(pcts)){
+    str = startAngles[1] + sum(pcts[0:(i-1),1])
+    end = startAngles[1] + sum(pcts[1:i,1])
+    angs = seq(str,end,by = .1)
+    out = polar2cart(angs,seq(1,1,length = length(angs)))
+    polygon(c(0,out$x,0),c(0,out$y,0),col=tranCol(cols[i],.85),border=tranCol(cols[i],.85),lwd=1)
+    text(out$x[floor(length(angs)/2)],out$y[floor(length(angs)/2)],paste0(round(tmp[i,1]*100,0),"%"))
+    
+    str = startAngles[2] + sum(pcts[0:(i-1),2])
+    end = startAngles[2] + sum(pcts[1:i,2])
+    angs = seq(str,end,by = .1)
+    out = polar2cart(angs,seq(1,1,length = length(angs)))
+    polygon(c(0,out$x,0),c(0,out$y,0),col=tranCol(cols[i],.75),border=tranCol(cols[i],.75),lwd=1)
+    text(out$x[floor(length(angs)/2)],out$y[floor(length(angs)/2)],paste0(round(tmp[i,2]*100,0),"%"))
+    
+  }
+  par(xpd = NA)
+  
+  text(0,1,colnames(input)[1],adj = c(.5,-.25),cex=1.2)
+  text(0,-1,colnames(input)[2],adj = c(.5,1),cex=1.2)
+  
+  left = floor(nrow(input)/2)
+  rght = nrow(input) - left
+  left = seq(-.2,.2,length=left)
+  rght = seq(-.2,.2,length=rght)
+  if(length(left) == 1){left = 0}
+  if(length(rght) == 1){right = 0}
+  
+  points(rep(-.88,length(left)),left,pch = 20,cex = 5, col = cols[1:length(left)])
+  text(rep(-.88,length(left)),left,rownames(input)[1:length(left)],pos = 4,offset = .75)
+  
+  points(rep(.88,length(rght)),rght,pch = 20,cex = 5, col = cols[length(left)+(1:length(rght))])
+  text(rep(.88,length(rght)),rght,rownames(input)[length(left)+(1:length(rght))],pos = 2,offset = .75)
+  
+  par(pty = 'm',xpd=FALSE)
+}
+
+#' Decay of opening week bump based on exponetial decay
+#' @param week number of weeks open
+#' @param type  c('customers','sales') everything else will be flat
+#' @return Multiplier greater or equal to 1
+#' @examples openBump(1:20,'sales') 
+#' 
+openBump = function(week,type){ #c('customers','sales')
+  # Author: MCKwit
+  
+  if(type == 'customers'){ 
+    par = c( 0.4597672, 2.809576, 0.2089885) 
+  }else{
+    par = c(1,0)
+  }
+  if(type == 'sales'){ 
+    par = c(0.5875478, 2.463422, 0.2223867) 
+  }
+  
+  (par[2] * par[1]*exp(-par[1]*week)) #- par[3]
+
+}
+
+#' 20 minute or drive time 8.5 mile sales percentage
+#' @param sales Sales within the 20 min drivetime or withn 8.5 mile radius
+#' @param city  City that focal drivetime is nearest to
+#' @return data.frame(local = percentile compared to focal city,location = focalCity ,top100 = percentile copmpared to top 100 largest cities)
+#' @examples dtSalesPct(sales = 200000,city = c('Denver','Chicago'))
+dtSalesPct = function(sales = 200000,city = c('Denver','Chicago')){
+  # Author: MCKwit
+  
+  tapply.matrix <- function(mat,margin,index,funct,...){ #tapply on matrix mckFUNCTIONS
+    apply(mat,margin,function(x){ tapply(x,index,funct,na.rm=T)})  
+  }
+  dat = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/allDT10Cities.rds')
+  dat = readRDS('C:/Users/mkwit/Desktop/allDT10Cities.rds')
+  whr = unlist(sapply(city,function(x) grep(x,dat[,9],ignore.case = TRUE) ))
+  tmp = dat[whr ,]
+  out = tapply.matrix(cbind(as.numeric(tmp[,10]),as.numeric(tmp[,'scalProf'])),2,tmp[,7],unique)
+  sam = sample(out[,2],100000,replace = T,prob = out[,1])
+  cum = ecdf(sam)
+  
+  out = tapply.matrix(cbind(as.numeric(dat[,10]),as.numeric(dat[,'scalProf'])),2,dat[,7],unique)
+  sam = sample(out[,2],100000,replace = T,prob = out[,1])
+  cum2 = ecdf(sam)
+  data.frame(local = 100*cum(sales),location = paste(unique(dat[whr,9]),collapse="-"),top100 = 100*cum2(sales))
+}
+
+#' Spiral Bar Plot
+#' 
+#'
+#' @examples data = c(10,20,40,90,190)
+#' @examples names(data) = c("The As","The Bs","The Cs","The Ds","The Fs")
+#' @examples spiralBar()
+spiralBar = function(data){
+  # Author: MCKwit
+  # Spiral Bar Plot
+  # data = c(10,20,40,90,190)
+  # names(data) = c("The As","The Bs","The Cs","The Ds","The Fs")
+  
+  scl = data - min(data)
+  scl = scl * (5/2)*pi /max(data) + pi/2
+  
+  theta = seq(6.5*pi,max(scl),by=-.1)
+  r = (theta^(10/9))
+  x = (r*cos(theta)) 
+  y = (r*sin(theta)) 
+  plot(x,y,type='n',
+       xlim = range(x)+c(-length(data),length(data))*1.25,
+       ylim = range(y)+c(-length(data),length(data))*1.25,
+       bty = 'n',xaxt='n',yaxt='n',xlab="",ylab="")
+  for(i in 1:length(data)){
+    theta = seq(6.5*pi,scl[i],by=-.1)
+    r = (theta^(10/9)) + i*1.25 - 1.25
+    x1 = (r*cos(theta)) 
+    y1 = (r*sin(theta))
+    r = (theta^(10/9)) + i*1.25 
+    x2 = (r*cos(theta)) 
+    y2 = (r*sin(theta)) 
+    
+    polygon(c(x1,rev(x2)),c(y1,rev(y2)),col = i)
+    text(x1[1],(y1[1] + y2[1])/2,names(data)[i],pos = 2,cex = .9)
+    
+    theta = seq(6.5*pi,scl[i],by=-pi/4)
+    r = (theta^(10/9)) + i*1.25 - 1.25/2
+    x1 = (r*cos(theta)) 
+    y1 = (r*sin(theta))
+    points(x1,y1,pch =15,cex = .5)
+    
+  }
+  
+}
+
+
+#' Random Role Assigner
+#'
+#' @examples RealEstateRoles(currentCoordinator = 'Dave',EMAIL = F)
+RealEstateRoles = function(currentCoordinator = NULL, EMAIL = T){
+  # Author: MCKwit
+  # Random Role Assigner
+  # currentCoordinator = c('Todd','Bobby','Dave','Erin','Greg','Matt')
+  
+  if (is.null(CurrentCoordinator)) {
+    stop("Rerun, Who is the current Coordinator?")
+  }
+  
+  library(stp)
+  
+  info = data.frame(
+    name = c('Todd','Bobby','Dave','Erin','Greg','Matt'), 
+    email = c('tconnelly@sierratradingpost.com','rresch@sierratradingpost.com',
+              'dbruce@sierratradingpost.com','ewurtz@sierratradingpost.com',
+              'gblack@sierratradingpost.com','mkwit@sierratradingpost.com')
+  )
+  
+  whr = grep(CurrentCoordinator,info$name,ignore.case = T)
+  coord = (1:nrow(info))[-whr]
+  coord = sample(coord,5)
+  packets = c(coord[-1],whr)
+  
+  if(EMAIL){
+    to = info$email
+    
+    body  = paste0(
+      "<p> This months real estate packet coordinator will be <b>",
+      info$name[coord[1]],
+      "</b>.</p> <p>If they are not avalible the order of backups and responsibility for packets falls to: <b>", 
+      pasteAnd(paste(1:5,info$name[packets], sep = ".")),
+      "</b>.</p> <p>If you do not like your role blame the old coordinator ", info$name[whr],".",
+      "</p> <br> <img src=\"stp-file1groupsDataModelingAndAnalyticsLogosdataSciencelogo.png\" alt=\"STP\" width=\"90\" height=\"90\">"
+    ) 
+    
+    psSendMail(to = to,
+               attachments = c('//stp-file1/groups/DataModelingAndAnalytics/Logos/dataSciencelogo.png'),
+               subject = "Real Estate Roles",
+               BodyAsHtml = body)
+  }
+}
+
+#' Rebuild drivetimes when stupidity erases them
+repopulateDriveTimes = function(driveTimes = c(10,20)){
+  # Author: MCKwit
+  require(ggmap)
+  locs <- readDB("select * from [Abacus].[dbo].[RetailMasterSummary]")
+  
+  whr = which(locs$OpenFlag == 1  | locs$ApprovedFlag  == 1)
+  locs = locs[whr,]
+  
+  for(i in 1:nrow(locs)){
+    lat = locs$Latitude[i]
+    lon = locs$Longitude[i]
+    name = locs$ProposalName[i]
+    for(j in driveTimes){
+      isochromeShapes(latLon = cbind(lat,lon) ,siteName = name, drivetime = j, num_angs = NULL)
+    }
+  }
+  
+}
+
+
+#' Build TJXdrivetimes 
+populateTJXDriveTimes = function(driveTimes = c(20)){
+  # Author: MCKwit
+  library(ggmap)
+  locs <- readDB("SELECT * FROM STPAnalyticsDev.dbo.StoreLocations with(nolock) where Chain = 'TJ MAXX'")
+  locs = locs[locs$Longitude != 0 & locs$Latitude != 0 ,]
+  locs = locs[!is.na(locs$Latitude),]
+  locs = locs[!is.na(locs$Longitude),]
+ 
+  cities = read.csv('//stp-file1/groups/DataModelingAndAnalytics/MCK/cities.csv')
+  for(k in 1:100){
+  whr = which(distance(cities[k,c('latitude','longitude')],locs[,c('Latitude','Longitude')],SQROOT = F) < 2.25)
+  locs = locs[whr,]
+  
+
+  for(i in 1:nrow(locs)){
+    lat = locs$Latitude[i]
+    lon = locs$Longitude[i]
+    name = locs$StoreName[i]
+    for(j in driveTimes){
+      isochromeShapesTJX(latLon = cbind(lat,lon) ,siteName = name, drivetime = j, num_angs = 20)
+      if(as.numeric(distQueryCheck()) < 500) stop("Within 500 of Query Limit")
+    }
+    if(as.numeric(distQueryCheck()) < 500) stop("Within 500 of Query Limit")
+  }
+  
+  }
+  
+}
+
+#' Zipcode to zipcode tabulation area
+#' 
+#' zips = c(60457,80521,27704,61820,11111,60115)
+#' ZIP2ZCTA(zips)
+ZIP2ZCTA <- function(zips){
+  # Author: MCKwit
+  
+  zipTrans <- readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/resources/zip_to_zcta_2016.rds')
+  whr = match( as.character(zips), as.zip(zipTrans$ZIP) )
+  zipTrans[whr,'ZCTA_USE']
+  
+}
+
+#' Scale zip-level sales to blockgroup
+#'input = 
+#'  data.frame(
+#'    ZIP = c(60457,80521,27704,61820,11111,60115),
+#'    sales = c(60457,80521,27704,61820,11111,60115)
+#'  )
+#'    
+Zip2Block_sales <- function(input,zipCol = 1,salesCol = 2){
+  # Author: MCKwit
+  #' Scale zip-level sales to blockgroup
+  #'input = 
+  #'  data.frame(
+  #'    ZIP = c(60457,80521,27704,61820,11111,60115),
+  #'    sales = c(60457,80521,27704,61820,11111,60115)
+  #'  )
+  #'    
+  
+  input = cbind(input)
+  
+  allDat = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/fittedCenDataSales.rds')
+  
+  input$ZCTA = ZIP2ZCTA(input[,zipCol]) 
+  
+  #Combine zips if duplicates
+  input = tapply(input[,salesCol],input$ZCTA,sum)
+  
+  subAll = allDat[as.character(allDat$ZCTA5CE10) %in% names(input),]
+  
+  subAll$profit = input[match(as.character(subAll$ZCTA5CE10) , names(input))]
+  
+  zips = unique(subAll$ZCTA5CE10)
+  for(i in 1:length(zips)){
+    whr = which(subAll$ZCTA5CE10 == zips[i])
+    if(sum(is.na(subAll[whr,'predProf'])) > 0 & sum(is.na(subAll[whr,'predProf'])) != length(whr) ){
+      whr2 = whr[is.na(subAll[whr,'predProf'])]
+      for(j in whr2){
+        tmp = distance(subAll[,c('INTPTLAT','INTPTLON')],subAll[j,c('INTPTLAT','INTPTLON')],SQROOT = F)
+        subAll[j,'predProf'] = median(subAll[order(tmp)[1:5],'predProf'],na.rm=T)
+      }
+      #subAll[whr,'predProf'][is.na(subAll[whr,'predProf'])] = median(subAll[whr,'predProf'],na.rm=T) #temp fix fill NAs fix later
+    }
+    subAll$scalProf[whr] = subAll[whr[1],'profit'] *(subAll[whr,'predProf'] / sum(subAll[whr,'predProf']))
+    if(i %% 100)print(i)
+    
+  }
+  subAll
+}
+
+
+#' Block-Group Sales/Demographics to Drivetime
+#' input = Zip2Block_sales(input) 
+#' lonLat = cbind(-105.075295, 40.539268)
+#' rownames(lonLat) = 'FORT COLLINS'
+#' dtSales(lonLat,input)
+dtSales <- function(lonLat,input,driveTimes = c(10,20)){
+  # Author: MCKwit
+  #' Block-Group Sales/Demographics to Drivetime
+  #' input = Zip2Block_sales(input) 
+  #' lonLat = cbind(-105.075295, 40.539268)
+  #' rownames(lonLat) = 'FORT COLLINS'
+  #' dtSales(lonLat,input)
+  
+  lonLat = cbind(lonLat)
+  out = NULL
+  for(kk in 1:nrow(lonLat)){
+    for(j in driveTimes){
+      
+      #whr = distLonLat(lonLat[kk,],  input[,c('INTPTLON','INTPTLAT')]) <= 2 * j
+      whr = distance(lonLat[kk,],  input[,c('INTPTLON','INTPTLAT')]) <= 3 * j / 69 #Faster but less accurate should be fine
+      
+      subAll = input[whr,]
+      
+      sts = str_pad(unique(subAll$STATEFP),width = 2,pad = '0')
+      
+      tmp = pathZip(paste0('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/blockGroupZipSimp/',sts[1],'.zip'),
+                    paste0(gsub(".zip","",sts[1]),"/state",gsub(".zip","",sts[1]),'BlockGroupZipSimp'),PRINT=F)
+      shp = readOGR(paste0(tmp$tmpPath,'/',sts[1]),
+                    paste0("state",sts[1],'BlockGroupZipSimp'))
+      
+      holdNames = colnames(shp@data)
+      
+      bb = bbox(shp)
+      bb['y',] =  range(subAll[,'INTPTLAT'])
+      bb['x',] =  range(subAll[,'INTPTLON'])
+      
+      whr <- ( bb[2,1] < as.numeric(as.character(shp$INTPTLAT)) & as.numeric(as.character(shp$INTPTLAT)) < bb[2,2] & 
+                 bb[1,1] < as.numeric(as.character(shp$INTPTLON)) & as.numeric(as.character(shp$INTPTLON)) < bb[1,2] )
+      shp = subset(shp, whr)
+      
+      if(length(sts)>1){
+        for(k in sts[-1]){
+          
+          tmp = pathZip(paste0('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/blockGroupZipSimp/',k,'.zip'),
+                        paste0(gsub(".zip","",k),"/state",gsub(".zip","",k),'BlockGroupZipSimp'),PRINT=F)
+          tmp = readOGR(paste0(tmp$tmpPath,'/',k),
+                        paste0("state",k,'BlockGroupZipSimp'))
+          
+          whr <- ( bb[2,1] < as.numeric(as.character(tmp$INTPTLAT)) & as.numeric(as.character(tmp$INTPTLAT)) < bb[2,2] & 
+                     bb[1,1] < as.numeric(as.character(tmp$INTPTLON)) & as.numeric(as.character(tmp$INTPTLON)) < bb[1,2] )
+          tmp = subset(tmp, whr)
+          shp = union(shp,tmp)
+          whr = which(!is.na(shp@data[1,]))
+          shp@data[which(is.na(shp@data[,1])),which(!is.na(shp@data[1,]))] = shp@data[which(is.na(shp@data[,1])),which(is.na(shp@data[1,]))]
+          shp@data = shp@data[,whr]
+          colnames(shp@data) = holdNames
+        }
+      }
+      
+      # Thu Apr 27 14:44:38 2017 ------------------------------
+      
+      whr = grep('ZCTA',colnames(shp@data))
+      whr = match(as.numeric(paste(shp@data[,c('GEOID')],as.zip(shp@data[,whr]),sep="")),
+                  as.numeric(paste(subAll[,c('GEOID')],as.zip(subAll[,'ZCTA5CE10']),sep="")))
+      shp@data$profit = subAll$scalProf[whr]
+      shp@data$perCapProf = subAll$scalProf[whr] /subAll$totalPop[whr]
+      shp@data$totalPop = subAll$totalPop[whr]
+      shp@data$totalWht = subAll$totalWht[whr]
+      shp@data$totalBlk = subAll$totalBlk[whr]
+      shp@data$totalAsn = subAll$totalAsn[whr]
+      shp@data$totalLat = subAll$totalLat[whr]
+      shp@data$medHouInc = subAll$medHouInc[whr]
+      shp@data$perCapInc = subAll$perCapInc[whr]
+      
+      #isochromeShapes(latLon = cbind(lonLat[k,2],lonLat[k,1]) ,siteName = rownames(lonLat)[k], drivetime = j)
+      file = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/data/driveTimePolygons.rds')
+      
+      #DriveTimes--
+      
+      whr = which(names(file) == paste(lonLat[kk,2],lonLat[kk,1],j,sep="_"))
+      
+      osm = "+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +no_defs" 
+      
+      dTShp = spTransform(file,osm)
+      shp1 = spTransform(shp,osm)
+      shp1@data$bArea = gArea(shp1,byid = T) 
+      dt = intersect(dTShp[whr],shp1)
+      dt@data$dTArea = gArea(dt,byid = T) 
+      shp1 = 0
+      
+      dt@data[,c(which(colnames(dt@data) == 'profit'),grep("total",colnames(dt@data)))]  = 
+        dt@data[,c(which(colnames(dt@data) == 'profit'),grep("total",colnames(dt@data)))] * (dt@data$dTArea / dt@data$bArea)
+      
+      dt@data$trueArea =  as.numeric(dt@data$ALAND) * (dt@data$dTArea / dt@data$bArea)
+      
+      out = rbind(out,c(
+        location = rownames(lonLat)[kk],
+        drivetime = j,
+        sales = sum(dt@data$profit,na.rm=T),
+        perCapProf = median(dt@data$perCapProf,na.rm=T),
+        totalPop = sum(dt@data$totalPop,na.rm=T),
+        totalWht = sum(dt@data$totalWht,na.rm=T),
+        totalBlk = sum(dt@data$totalBlk,na.rm=T),
+        totalAsn = sum(dt@data$totalAsn,na.rm=T),
+        totalLat = sum(dt@data$totalLat,na.rm=T),
+        medHouInc = median(as.numeric(dt@data$medHouInc),na.rm=T),
+        perCapInc = median(as.numeric(dt@data$perCapInc),na.rm=T),
+        area = sum(dt@data$trueArea,na.rm=T)*0.621371*0.621371
+      ))
+      
+    }
+  }
+  out
+}
+
+allBB = data.frame(
+  
+  st = c(01,02,04,05,06,08,09,10,11,12,13,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,44,45,46,47,48,49,50,51,53,54,55,56),
+  lon.min = c(-88.473227,-179.231086,-114.816591,-94.617919,-124.482003,-109.060204,-73.727775,-75.789023,-77.119759,-87.634896,-85.605165,-178.443593,-117.243027,-91.513079,-88.097892,-96.639485,-102.051769,-89.571203,-94.043352,-71.083928,-79.487651,-73.50821,-90.418392,-97.239093,-91.655009,-95.774704,-116.049153,-104.053514,-120.006473,-72.557124,-75.563586,-109.050431,-79.76259,-84.321821,-104.049118,-84.820305,-103.002413,-124.703541,-80.519851,-71.907258,-83.353928,-104.057879,-90.310298,-106.645646,-114.052885,-73.437905,-83.675395,-124.848974,-82.644591,-92.889433,-111.054558),
+  lon.max = c(-84.888246,179.859681,-109.045172,-89.644395,-114.131211,-102.041522,-71.787239,-74.984165,-76.909393,-79.974306,-80.751429,-154.755792,-111.043495,-87.019935,-84.784592,-90.140061,-94.588387,-81.964788,-88.758388,-66.885444,-74.986282,-69.858861,-82.122971,-89.483385,-88.097888,-89.098968,-104.039694,-95.30829,-114.039461,-70.575094,-73.88506,-103.002043,-71.777491,-75.400119,-96.554411,-80.518705,-94.43101,-116.463262,-74.689502,-71.088571,-78.499301,-96.436472,-81.6469,-93.508039,-109.041572,-71.465047,-75.166435,-116.916071,-77.719519,-86.249548,-104.052245),
+  lat.min = c(30.144425,51.175092,31.332177,33.004106,32.528832,36.992449,40.950943,38.451132,38.791645,24.396308,30.355757,18.86546,41.988182,36.970298,37.771728,40.37544,36.993016,36.497058,28.855127,42.917126,37.886605,41.187053,41.696118,43.499361,30.139845,35.995683,44.357915,39.999932,35.001857,42.697042,38.788657,31.332231,40.477399,33.752878,45.935072,38.403423,33.615787,41.992082,39.719799,41.095834,32.033454,42.479686,34.982924,25.837164,36.997657,42.726933,36.540852,45.543541,37.20154,42.49172,40.994772),
+  lat.max = c(35.008028,71.441059,37.003725,36.499749,42.009503,41.003444,42.050511,39.839516,38.995845,31.000968,35.001303,28.517269,49.000911,42.508481,41.761368,43.501196,40.003166,39.147732,33.019543,47.459854,39.723037,42.886778,48.306063,49.384358,34.996099,40.61364,49.0011,43.001707,42.001842,45.305778,41.357423,37.000233,45.015865,36.588137,49.000692,42.327132,37.002312,46.299099,42.516072,42.018799,35.21554,45.945377,36.678255,36.500704,42.001702,45.016659,39.466012,49.002432,40.638801,47.309822,45.005815)
+)
+
+#' lonLat = rbind(c(-105.075295, 40.539268),c(-115.075295, 42.539268))
+#' sales = c(1000,10000)
+points2BlockGroup = function(lonLat,sales){
+  
+  # Author: MCKwit
+  #' lonLat = rbind(c(-105.075295, 40.539268),c(-115.075295, 42.539268))
+  #' sales = c(1000,10000)
+  require(rgdal)
+  require(sp)
+  require(raster)
+  
+  allBB = data.frame(
+    
+    st = c(01,02,04,05,06,08,09,10,11,12,13,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,44,45,46,47,48,49,50,51,53,54,55,56),
+    lon.min = c(-88.473227,-179.231086,-114.816591,-94.617919,-124.482003,-109.060204,-73.727775,-75.789023,-77.119759,-87.634896,-85.605165,-178.443593,-117.243027,-91.513079,-88.097892,-96.639485,-102.051769,-89.571203,-94.043352,-71.083928,-79.487651,-73.50821,-90.418392,-97.239093,-91.655009,-95.774704,-116.049153,-104.053514,-120.006473,-72.557124,-75.563586,-109.050431,-79.76259,-84.321821,-104.049118,-84.820305,-103.002413,-124.703541,-80.519851,-71.907258,-83.353928,-104.057879,-90.310298,-106.645646,-114.052885,-73.437905,-83.675395,-124.848974,-82.644591,-92.889433,-111.054558),
+    lon.max = c(-84.888246,179.859681,-109.045172,-89.644395,-114.131211,-102.041522,-71.787239,-74.984165,-76.909393,-79.974306,-80.751429,-154.755792,-111.043495,-87.019935,-84.784592,-90.140061,-94.588387,-81.964788,-88.758388,-66.885444,-74.986282,-69.858861,-82.122971,-89.483385,-88.097888,-89.098968,-104.039694,-95.30829,-114.039461,-70.575094,-73.88506,-103.002043,-71.777491,-75.400119,-96.554411,-80.518705,-94.43101,-116.463262,-74.689502,-71.088571,-78.499301,-96.436472,-81.6469,-93.508039,-109.041572,-71.465047,-75.166435,-116.916071,-77.719519,-86.249548,-104.052245),
+    lat.min = c(30.144425,51.175092,31.332177,33.004106,32.528832,36.992449,40.950943,38.451132,38.791645,24.396308,30.355757,18.86546,41.988182,36.970298,37.771728,40.37544,36.993016,36.497058,28.855127,42.917126,37.886605,41.187053,41.696118,43.499361,30.139845,35.995683,44.357915,39.999932,35.001857,42.697042,38.788657,31.332231,40.477399,33.752878,45.935072,38.403423,33.615787,41.992082,39.719799,41.095834,32.033454,42.479686,34.982924,25.837164,36.997657,42.726933,36.540852,45.543541,37.20154,42.49172,40.994772),
+    lat.max = c(35.008028,71.441059,37.003725,36.499749,42.009503,41.003444,42.050511,39.839516,38.995845,31.000968,35.001303,28.517269,49.000911,42.508481,41.761368,43.501196,40.003166,39.147732,33.019543,47.459854,39.723037,42.886778,48.306063,49.384358,34.996099,40.61364,49.0011,43.001707,42.001842,45.305778,41.357423,37.000233,45.015865,36.588137,49.000692,42.327132,37.002312,46.299099,42.516072,42.018799,35.21554,45.945377,36.678255,36.500704,42.001702,45.016659,39.466012,49.002432,40.638801,47.309822,45.005815)
+  )
+  
+  whr = lapply(1:nrow(lonLat),function(x) which( allBB$lon.min <= lonLat[x,1] & lonLat[x,1] <= allBB$lon.max & 
+                                                   allBB$lat.min <= lonLat[x,2] & lonLat[x,2] <= allBB$lat.max ))
+  sts = lapply(1:length(whr), function(x)  str_pad(allBB$st[whr[[x]]],width = 2,pad = '0'))
+  allSts = unique(unlist(sts))
+  out = NULL
+  for(i in 1:length(allSts)){
+    
+    tmp = pathZip(paste0('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/blockGroupZipSimp/',allSts[i],'.zip'),
+                  paste0(gsub(".zip","",allSts[i]),"/state",gsub(".zip","",allSts[i]),'BlockGroupZipSimp'),PRINT=F)
+    shp = readOGR(paste0(tmp$tmpPath,'/',allSts[i]),
+                  paste0("state",allSts[i],'BlockGroupZipSimp'))
+    
+    
+    whr = sapply(1:length(sts),function(x) allSts[i] %in% sts[[x]] )
+    
+    spCoords = SpatialPoints(cbind(lonLat[whr,1],lonLat[whr,2]),proj4string=crs(shp))
+    
+    tmpOut = spCoords %over% shp
+    whr2 = which(!is.na(tmpOut$STATEFP))
+    if(length(whr2) == 0 ) next
+    whr = which(whr)[whr2]
+    out = rbind(out,cbind(tmpOut[whr2,],sales = sales[whr]))
+    
+  }
+  out = tapply(out[,'sales'],out[,'GEOID'],function(x) sum(as.numeric(x), na.rm=T) )
+  
+  allDat = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/fittedCenDataSales.rds')
+  
+  whr = match(names(out),str_pad(allDat$GEOID,width = 12,pad = '0'))
+  
+  allDat$scalProf[whr] = out 
+  allDat[whr,]
+  
+}
+
+
+addDemo2points = function(lonLat){
+  
+  # Author: MCKwit
+  #' lonLat = rbind(c(-105.075295, 40.539268),c(-115.075295, 42.539268))
+  #' sales = c(1000,10000)
+  
+  allBB = data.frame(
+    
+    st = c(01,02,04,05,06,08,09,10,11,12,13,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,44,45,46,47,48,49,50,51,53,54,55,56),
+    lon.min = c(-88.473227,-179.231086,-114.816591,-94.617919,-124.482003,-109.060204,-73.727775,-75.789023,-77.119759,-87.634896,-85.605165,-178.443593,-117.243027,-91.513079,-88.097892,-96.639485,-102.051769,-89.571203,-94.043352,-71.083928,-79.487651,-73.50821,-90.418392,-97.239093,-91.655009,-95.774704,-116.049153,-104.053514,-120.006473,-72.557124,-75.563586,-109.050431,-79.76259,-84.321821,-104.049118,-84.820305,-103.002413,-124.703541,-80.519851,-71.907258,-83.353928,-104.057879,-90.310298,-106.645646,-114.052885,-73.437905,-83.675395,-124.848974,-82.644591,-92.889433,-111.054558),
+    lon.max = c(-84.888246,179.859681,-109.045172,-89.644395,-114.131211,-102.041522,-71.787239,-74.984165,-76.909393,-79.974306,-80.751429,-154.755792,-111.043495,-87.019935,-84.784592,-90.140061,-94.588387,-81.964788,-88.758388,-66.885444,-74.986282,-69.858861,-82.122971,-89.483385,-88.097888,-89.098968,-104.039694,-95.30829,-114.039461,-70.575094,-73.88506,-103.002043,-71.777491,-75.400119,-96.554411,-80.518705,-94.43101,-116.463262,-74.689502,-71.088571,-78.499301,-96.436472,-81.6469,-93.508039,-109.041572,-71.465047,-75.166435,-116.916071,-77.719519,-86.249548,-104.052245),
+    lat.min = c(30.144425,51.175092,31.332177,33.004106,32.528832,36.992449,40.950943,38.451132,38.791645,24.396308,30.355757,18.86546,41.988182,36.970298,37.771728,40.37544,36.993016,36.497058,28.855127,42.917126,37.886605,41.187053,41.696118,43.499361,30.139845,35.995683,44.357915,39.999932,35.001857,42.697042,38.788657,31.332231,40.477399,33.752878,45.935072,38.403423,33.615787,41.992082,39.719799,41.095834,32.033454,42.479686,34.982924,25.837164,36.997657,42.726933,36.540852,45.543541,37.20154,42.49172,40.994772),
+    lat.max = c(35.008028,71.441059,37.003725,36.499749,42.009503,41.003444,42.050511,39.839516,38.995845,31.000968,35.001303,28.517269,49.000911,42.508481,41.761368,43.501196,40.003166,39.147732,33.019543,47.459854,39.723037,42.886778,48.306063,49.384358,34.996099,40.61364,49.0011,43.001707,42.001842,45.305778,41.357423,37.000233,45.015865,36.588137,49.000692,42.327132,37.002312,46.299099,42.516072,42.018799,35.21554,45.945377,36.678255,36.500704,42.001702,45.016659,39.466012,49.002432,40.638801,47.309822,45.005815)
+  )
+  
+  whr = lapply(1:nrow(lonLat),function(x) which( allBB$lon.min <= lonLat[x,'Longitude'] & lonLat[x,'Longitude'] <= allBB$lon.max & 
+                                                   allBB$lat.min <= lonLat[x,'Latitude'] & lonLat[x,'Latitude'] <= allBB$lat.max ))
+  sts = lapply(1:length(whr), function(x)  str_pad(allBB$st[whr[[x]]],width = 2,pad = '0'))
+  allSts = unique(unlist(sts))
+  out = NULL
+  for(i in 1:length(allSts)){
+    
+    tmp = pathZip(paste0('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/blockGroupZipSimp/',allSts[i],'.zip'),
+                  paste0('tl_2016_',allSts[i],'_bg'),PRINT=F)
+    shp = readOGR(tmp$tmpPath,
+                  paste0('tl_2016_',allSts[i],'_bg'))
+    
+    whr = sapply(1:length(sts),function(x) allSts[i] %in% sts[[x]] )
+    
+    spCoords = SpatialPoints(cbind(lonLat[whr,'Longitude'],lonLat[whr,'Latitude']),proj4string=crs(shp))
+    
+    tmpOut = spCoords %over% shp
+    whr2 = which(!is.na(tmpOut$STATEFP))
+    if(length(whr2) == 0 ) next
+    whr = which(whr)[whr2]
+    out = rbind(out,cbind(tmpOut[whr2,],lonLat[whr,]))
+    
+  }
+  
+  allDat = readRDS('//stp-file1/groups/DataModelingAndAnalytics/MCK/isochrome/fittedCenDataSales.rds')
+  
+  whr = match(out[,'GEOID'],str_pad(allDat$GEOID,,width = 12,pad = '0'))
+  
+  out = cbind(out,allDat[whr,])
+  out = out[,c('STATEFP','GEOID','MergedCurrentPartyCode','AgeMatch','Age',
+               'EstimatedRange','EstHouseholdIncome','TypeofEducationMatch',
+               'EducationType', 'Gender', 'LatLongIndicator',  'Latitude', 'Longitude',
+               'totalPop', 'totalWht', 'totalBlk', 'totalAsn', 'totalLat',
+               'medHouInc', 'perCapInc', 'medRent', 'medHouValue')]
+  out
+  
+}
+
+
+#' Factors to dummy variables
+facTOdummy <- function(fact, firstZERO = T){ #makes dummy variables
+  
+  # Author: MCKwit
+  if(firstZERO == T){
+    is <- sort(unique(fact))
+    numIS <- length(is)
+    dumbMAT <- matrix(0,length(fact),(numIS-1))
+    
+    for(i in 2:numIS){
+      dumbMAT[which(fact == is[i]),i-1] <- 1
+    }
+    colnames(dumbMAT) <- is[-1]
+  }
+  
+  if(firstZERO == F){
+    is <- sort(unique(fact))
+    numIS <- length(is)
+    dumbMAT <- matrix(0,length(fact),(numIS))
+    
+    for(i in 1:numIS){
+      dumbMAT[which(fact == is[i]),i] <- 1
+    }
+    colnames(dumbMAT) <- is
+  }
+  
+  dumbMAT
+}
+
+getRandomUnsubComment <- function(n=1,Ofinterest="",id="") {
+  # Author: Todd C.
+  # Date: 7/14/2017
+  # Fetch 'n' random unsubscribe comments 
+  
+  #Setup DataBase Connection to ODS 
+  require(RODBC)
+  server="sqlods"
+  database="stp_ods_live"
+  connectionstring=paste0( "DRIVER={SQL Server Native Client 11.0};Server=",
+                      server,";Database=",database,";Trusted_Connection=yes")
+  ch <- odbcDriverConnect(connectionstring)
+  
+  if(is.numeric(id) & id !="" & id >0 ){
+  query <- paste0("SELECT 
+   cast(survey.[SurveyNote] as varchar(8000) ) SurveyNote,
+  survey.[CreateTimeStamp],
+  survey.DealFlyerUnsubscribeSurveyId
+  FROM 
+  [stp_ods_live].[dbo].[DealFlyerUnsubscribeSurveys] survey   with(nolock)
+  inner join 
+  [stp_ods_live].[dbo].[DealFlyerUnsubscribeReasons] reason  with(nolock)
+  on survey.[DealFlyerUnsubscribeReasonId]=reason.[DealFlyerUnsubscribeReasonId]
+  Where 
+  survey.DealFlyerUnsubscribeSurveyId = ",id)
+  } else if (nchar(Ofinterest) !=0){
+  
+  query <- paste0("SELECT  Top ",n,"
+   cast(survey.[SurveyNote] as varchar(8000) ) SurveyNote,
+  survey.[CreateTimeStamp],
+  survey.DealFlyerUnsubscribeSurveyId
+  FROM 
+  [stp_ods_live].[dbo].[DealFlyerUnsubscribeSurveys] survey   with(nolock)
+  inner join 
+  [stp_ods_live].[dbo].[DealFlyerUnsubscribeReasons] reason  with(nolock)
+  on survey.[DealFlyerUnsubscribeReasonId]=reason.[DealFlyerUnsubscribeReasonId]
+  Where 
+  survey.[CreateTimeStamp] > '2013-08-01 12:00:00.000' --and  '2013-09-01 12:00:00.000' 
+  and SurveyNote is not null and SurveyNote !='' and 
+SurveyNote like'%",Ofinterest,"%'
+  Order By 
+  newid()")
+  }
+  else {
+    query <- paste0("SELECT  Top ",n,"
+                    cast(survey.[SurveyNote] as varchar(8000) ) SurveyNote,
+                    survey.[CreateTimeStamp],
+                    survey.DealFlyerUnsubscribeSurveyId
+                    
+                    FROM 
+                    [stp_ods_live].[dbo].[DealFlyerUnsubscribeSurveys] survey   with(nolock)
+                    inner join 
+                    [stp_ods_live].[dbo].[DealFlyerUnsubscribeReasons] reason  with(nolock)
+                    on survey.[DealFlyerUnsubscribeReasonId]=reason.[DealFlyerUnsubscribeReasonId]
+                    Where 
+                    survey.[CreateTimeStamp] > '2013-08-01 12:00:00.000' --and  '2013-09-01 12:00:00.000' 
+                    and SurveyNote is not null and SurveyNote !=''
+                    Order By 
+                    newid()")
+    
+  }
+  
+  mydata <- sqlQuery(ch,query,stringsAsFactors=F)
+  close(ch)
+  return(
+      cat(paste(
+        "Comment = ",
+        mydata$SurveyNote,
+        "\n",
+        "Time = ",
+        mydata$CreateTimeStamp,
+        "\n",
+        "ID = ",
+        mydata$DealFlyerUnsubscribeSurveyId ,
+        "\n\n")
+      )
+    )# End Return
+}
+  
+  
+vote <- function(id) {
+  # Author: Todd C.
+  # Date: 7/14/2017
+  require(RODBC)
+  server="SQLDW"
+  database="stpANALYTICSdEV"
+  connectionstring=paste0( "DRIVER={SQL Server Native Client 11.0};Server=",
+                           server,";Database=",database,";Trusted_Connection=yes")
+  ch <- odbcDriverConnect(connectionstring)
+  query <- paste0(
+    "insert into [stpAnalyticsDev].dbo.unsubVotes  (DealFlyerUnsubscribeSurveyId ) Select ",id
+  )
+  sqlQuery(ch,query)
+}
+
+BackupFile = function( originalName, folderPath, backUpAge = 'month', deleteOlderThan = 365, GROWING = F) {
+  
+  # Author: MCKwit 2017-07-26
+  # backUpAge = 'day','week','month','quarter','year' Interval to backup at
+  # deleteOlderThan = 365 deletbackups older than (always keeps two copies)
+  # growing = F If True the file will update if bigger If F It will update if newer
+  # folderPath path to file
+  # originalName file
+  
+  
+  dir.create(paste0(folderPath,'backup'), showWarnings = FALSE)
+  file.copy(from = paste0(folderPath,originalName),to = paste0(folderPath,'backup/backup_',originalName),overwrite = F)
+  
+  d = date2Fiscal(strftime(Sys.time(), format = "%Y-%m-%d"))
+  if(backUpAge == 'year'){
+    d = paste(backUpAge,d$year,sep="_")
+  } else {
+    d = paste(backUpAge,d[[backUpAge]],d$year,sep="_")
+  }
+  file.copy(from = paste0(folderPath,originalName),to = paste0(folderPath,'backup/',d,'_backup_',originalName),overwrite = F)
+  
+  if (GROWING == T){
+    if (file.info(paste0(folderPath,originalName))$size > file.info( paste0(folderPath,'backup/backup_',originalName))$size) {
+      file.copy(from = paste0(folderPath,originalName),to = paste0(folderPath,'backup/backup_',originalName),overwrite = T)
+    }
+  } else {
+    if (file.info(paste0(folderPath,originalName))$mtime > file.info( paste0(folderPath,'backup/backup_',originalName))$mtime) {
+      file.copy(from = paste0(folderPath,originalName),to = paste0(folderPath,'backup/backup_',originalName),overwrite = T)
+    }
+  }
+  
+  files = list.files(paste0(folderPath,'backup'), full.names = T,pattern = paste0('backup_',originalName))
+  files = files[which(files != paste0(folderPath,'backup/backup_',originalName))]
+  files = files[-which.min(file.info(files)$mtime)]
+  files = files[difftime(Sys.time(),file.info(files)$mtime,units = 'days') > deleteOlderThan]
+  file.remove(files)
+}
+
+
+SourceFunctions = function(fullScriptName) {
+  
+  # Author: MCKwit 2018-07-28
+  # full path and name of scirpt that contains functions
+  # Source all functions contained between "# functions>>>>" and "# <<<<functions" in file
+  # "# functions>>>>" and "# <<<<functions" on their own line
+    
+  #path = dirname(sys.frame(1)$ofile)  
+  script =readLines(fullScriptName)
+  
+  #whr = regexpr('# functions>>>>',script)
+  #whr2 = regexpr('# <<<<functions',script)
+  #script = substr(script, whr[1]+attr(whr,"match.length"), whr2[1])
+  whr = grep('# functions>>>>',script) 
+  whr2 = grep('# <<<<functions',script)
+  script = paste(script[whr:whr2], collapse = " \n ")
+  
+  eval(parse(text=script))
+  
+}
+
+# As.numeric
+a.n = function(x) { as.numeric(x) }
+
+# As.charater
+a.c = function(x) { as.character(x) }
+
+# Factor to number
+Fact2Num = function(x) { as.numeric(as.character(x)) }
+
+
+
+# add a tracking document of all created processes
+ProjectInit = function(path = "//stp-file1/groups/DataModelingAndAnalytics/Dev_Projects" , name = 'test_project') {
+  
+  name = tolower(name)
+  path = paste0(path,'/',name)
+  dir.create(path,showWarnings = FALSE)
+  
+  folders = c('/code','/code/r', '/code/sql','/code/other', '/archive', '/out','/out/figure','/out/table', '/data', '/doc')
+  for(i in 1:length(folders)){
+    dir.create(paste0(path,folders[i]),showWarnings = FALSE)
+  }
+  
+  # Get user Input
+  print("What is the purpose of this analysis?")
+  purpose <- readline()
+  print("What is the nature of this project? Adhoc Data Pull or larger project?")
+  scope <- readline()
+  print("Who is requesting this project?")
+  requestor <- readline()
+  
+  files = c('_functions.R','_control.R','_process.R','_analysis.R','_output.R','_report.Rmd')
+  for (i in 1:length(files)) {
+    if (!file.exists(paste0(path,'/code/r/',i-1,'_',name, files[i]))) {
+      file.create(paste0(path,'/code/r/',i-1,'_',name, files[i]), showWarnings = FALSE)
+    }
+  }
+
+    tmp = readLines(paste0(path,'/code/r/1_',name,'_control.R'))
+    tmp = 
+      paste0(
+        "
+        # 1.Copyright statement comment -----------------------------------------------------------------
+
+        # 2.Author: ",Sys.getenv("USERNAME")," ----------------------------------------------------------
+        #   Date: ", Sys.Date(), "  
+        
+        # 3.File description comment, including purpose of program, inputs, and outputs -----------------
+        # 
+        # Purpose: ",purpose,"\n",
+        "
+        # Scope: ",scope,"\n",
+        "
+        # Requestor: ",requestor,"\n",
+        "
+        # 4.source() and library() statements -----------------------------------------------------------
+        
+        source('//stp-file1/groups/DataModelingAndAnalytics/MCK/stpFunction/stpFunctions.r')
+        source('",paste0(path,'/code/r/0_',name,'_functions.R'),"')
+        options(stringsAsFactors = F)
+        stpColors()
+        
+        # 5.Function definitions ------------------------------------------------------------------------
+        
+        # 6.Executed statements, if applicable (e.g., print, plot) --------------------------------------
+
+        setwd('",path,"')
+        
+        # process
+        source('",paste0(path,'/code/r/2_',name,'_process.R'),"')
+        
+        # analysis
+        source('",paste0(path,'/code/r/3_',name,'_analysis.R'),"')
+        
+        # output
+        source('",paste0(path,'/code/r/4_',name,'_output.R'),"')
+        "
+      )
+    writeLines(tmp, paste0(path,'/code/r/1_',name,'_control.R'))
+  
+  if(!file.exists(paste0(path,'/readme.MD'))) {
+    file.create(paste0(path,'/readme.MD'), showWarnings = FALSE)
+    tmp = readLines(paste0(path,'/readme.MD'))
+    tmp = 
+      paste0(
+        "
+        # Title ", name,
+        "
+        ### Author ", Sys.getenv("USERNAME"),
+        "
+        ### Date ", Sys.Date(),
+        "
+        # Objective  
+        
+        ## Purpose: ",purpose,"\n",
+        "
+        ## Scope: ",scope,"\n",
+        "
+        ## Requestor: ",requestor,"\n",
+        "
+        # Definitions
+      
+        # Directory
+        `",path,"`
+
+        # Code
+
+        # Output
+        "
+      )
+    writeLines(tmp, paste0(path,'/readme.MD'))
+  }
+    
+  if(!file.exists(paste0(path,'/code/sql/1_',name,'.SQL'))) {
+    file.create(paste0(path,'/code/sql/1_',name,'.SQL'), showWarnings = FALSE)  
+    tmp = 
+      paste0(
+      "/*********************************************************************************************************************
+        
+      Date Created: ",Sys.Date(),"
+      
+      Created By: ",Sys.getenv("USERNAME"),"
+      
+      Title:  ", name,"           
+      
+      Current Owner: ",Sys.getenv("USERNAME"),"
+      
+      Objective: ",purpose,"
+      
+      Definitions:  
+      
+      Final Table:  
+  
+      Edited: 
+      
+      *********************************************************************************************************************/"
+      )
+    writeLines(tmp, paste0(path,'/code/sql/1_',name,'.SQL'))
+  }
+   # Add git repo
+   # system("git init")
+   # system("git add -A")
+   # system("git commit -m \"Initial Commit\" ")
+    
+    tmp = "
+    # History files
+    .Rhistory
+    .Rapp.history
+    
+    # Session Data files
+    .RData
+    
+    # Example code in package build process
+    *-Ex.R
+    
+    # Output files from R CMD build
+    /*.tar.gz
+    
+    # Output files from R CMD check
+    /*.Rcheck/
+      
+      # RStudio files
+      .Rproj.user/
+      
+      # produced vignettes
+      vignettes/*.html
+    vignettes/*.pdf
+    
+    # OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+    .httr-oauth
+    
+    # knitr and R markdown default cache directories
+    /*_cache/
+      /cache/
+      
+      # Temporary files created by R markdown
+      *.utf8.md
+    *.knit.md
+    
+    # Excel Files
+    *.xlsx
+    *.xlx
+
+    # CSV Files
+    *.csv
+    "
+    writeLines(tmp, paste0(path,'/.gitignore'))
+    
+  print(paste0("Your project was created at: '",path,"'"))
+  file.edit(paste0(path,'/code/r/1_',name,'_control.R'))
+}
+
+############### apply tapply
+tapply.matrix <- function(mat,margin,index,funct,...){ #tapply on matrix mckFUNCTIONS
+  apply(mat,margin,function(x){ tapply(x,index,funct,na.rm=T)})  
+}
+
